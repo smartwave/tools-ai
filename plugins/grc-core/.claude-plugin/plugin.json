@@ -1,0 +1,18 @@
+{
+  "name": "grc-core",
+  "displayName": "Governance & Risk Core",
+  "version": "1.1.0",
+  "description": "Governance, Risk & Compliance skills. Includes security-review-travel-risk (international travel work-request risk review), tprm-security-review (read-only third-party/vendor security risk review scoring Likelihood × Impact on the sanctioned matrix), and tprm-vendor-review-update (gated write-back of an approved review outcome to the compliance platform — Drata in the reference configuration — and the inventory). Recommendation only — never approves, sends, or acts.",
+  "author": {
+    "name": "Matt Richardson (smartwave)"
+  },
+  "keywords": [
+    "grc",
+    "security",
+    "risk",
+    "compliance",
+    "travel-risk",
+    "tprm",
+    "vendor-risk"
+  ]
+}

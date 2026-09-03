@@ -1,0 +1,9 @@
+run_date: "2026-03-01"
+runs: 3
+model: claude
+model_version: fixture-model-1
+prompt_version: 1.0.0
+scores: [19, 19, 20]
+error_rate_range: {min: 0.0, max: 0.04}
+failures_by_kind: {silent-data-loss: 2, wrong-recipient: 0}
+reviewed_by: Robin Business-Owner

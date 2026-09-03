@@ -1,0 +1,31 @@
+name: open-items-tests
+
+# Runs the open-items skill's own tests.
+#
+# This workflow used to validate OPEN-ITEMS.md files in this repository. It no
+# longer can: tracker files live in one folder on the user's machine
+# (~/Documents/Claude/Claude Task Tracker), never in a repo, so a hosted runner
+# has nothing to validate. What it can still do is prove the skill's parser,
+# validator and listing behave — which is what the tests cover.
+
+on:
+  push:
+    paths:
+      - "plugins/personal-assistant/**"
+      - ".github/workflows/open-items-tests.yml"
+  pull_request:
+    paths:
+      - "plugins/personal-assistant/**"
+      - ".github/workflows/open-items-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Skill tests
+        # No dependencies to install — the skill is stdlib-only by design.
+        run: python "plugins/personal-assistant/skills/open-items/tests/test_open_items.py"

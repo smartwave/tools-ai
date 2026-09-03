@@ -1,0 +1,30 @@
+{
+  "name": "ai-solution-builder",
+  "version": "1.4.0",
+  "displayName": "AI Solution Builder",
+  "description": "AI Solution Builder — guides an AI solution through the staged, gated pipeline. Stage 0 is four steps: the Ultralight Problem Brief (problem statement, validated root cause, process-level future state, in the person's own words), the POC Brief with its paste-ready build prompt, a local throwaway proof of concept with a change log of every vibe-coded change, and the POC Summary that opens the conversation with IT. Then the AI Solution Requirements document (Gate 1), the Solution Design with authored tests (required for a new Tier 2/3 solution), the Solution Spec, and the work-effort Epic in the work tracker (B1.9), for AI solutions that drive a business workflow. Org-wide and non-engineer friendly. Guides, never authors the person's content; prototypes POCs to learn (never to deploy); refines and records the builder's own input into review-ready documents; proposes work-tracker issues with explicit approval; never originates, fabricates, or auto-creates. Reads the bundled Standard, methods, and templates as source of truth so guidance can't drift from policy. Ships five Gemini Gem instruction sets that produce the same Stage 0 outputs.",
+  "author": {
+    "name": "Matt Richardson (smartwave)"
+  },
+  "keywords": [
+    "ai-solution-builder",
+    "proof-of-concept",
+    "requirements",
+    "solution-spec",
+    "solution-design",
+    "testing",
+    "work-planner",
+    "jira",
+    "intake",
+    "risk-tier",
+    "pre-flight",
+    "compliance",
+    "automation",
+    "problem-framing",
+    "root-cause",
+    "future-state",
+    "poc-brief",
+    "poc-summary",
+    "gemini-gems"
+  ]
+}

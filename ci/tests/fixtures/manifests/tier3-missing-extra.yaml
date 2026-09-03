@@ -1,0 +1,18 @@
+asset_id: "ORG-AI-FIXTURE-TIER3"
+name: fixture-tier3
+version: 1.0.0
+scope: non-product
+workload_type: tool
+shape: workflow
+tier: 3
+track: a
+oversight: hitl
+data_class: confidential
+owner: Dana Example
+lifecycle: active
+business_unit: dataops
+vendor: claude
+records:
+  requirements: https://wiki.example/requirements
+  spec: https://wiki.example/spec
+  epic: EX-1

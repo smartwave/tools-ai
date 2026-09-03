@@ -1,0 +1,29 @@
+# Adopter configuration for the governance checks in ci/.
+#
+# Copy this file to config/governance.yaml (git-ignored) and set real values.
+#   cp config/governance.example.yaml config/governance.yaml
+#
+# This file exists so the committed tree can stay generic: the checks resolve
+# {{ASSET_ID_PREFIX}} / {{TAG_NAMESPACE}} / {{ORG_NAME}} / {{DOC_ID_PREFIX}}
+# tokens read out of schemas/, vocabulary/ and projections/ at runtime, in
+# memory only. The alternative adoption path — doing the documented
+# find-and-replace across the tree — needs no config file at all; the loader
+# detects it.
+
+org_name: "Example Org"
+
+# Prefix every asset_id carries. Includes the trailing hyphen.
+# IMMUTABLE once any real asset is minted — ids are never rewritten.
+asset_id_prefix: "ORG-AI-"
+
+# Tag/topic namespace. No punctuation: it becomes both "<ns>:" AWS tag keys
+# and "<ns>-" GitHub topics.
+tag_namespace: "org"
+
+# Prefix for governed document ids (e.g. ORG-STD-SSDLC-AGENTIC-001).
+doc_id_prefix: "ORG"
+
+# Rules tagged [REF insert] in policy/ come from the pending naming/tagging
+# insert and are NOT enforceable until that insert is ratified in Confluence.
+# While false they run warn-only. Flip to true only once ratification lands.
+enforce_pending_insert: false

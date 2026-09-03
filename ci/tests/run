@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# ci/tests/run — fixture suite for the governance checks.
+#
+# Every case names the expected exit code and a substring the message must
+# carry, so a rule cannot silently stop being enforced. Fixtures live in
+# ci/tests/fixtures/; the suite points the checks at the fixture config and the
+# fixture asset tree, never at the adopter's own.
+#
+# Usage: ci/tests/run          (PYTHON=... to pick an interpreter)
+
+set -uo pipefail
+
+CI_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+FIX="$CI_DIR/tests/fixtures"
+PYTHON="${PYTHON:-python3}"
+
+export GOVERNANCE_ASSETS_DIR="$FIX/assets"
+
+pass=0
+fail=0
+
+expect() {  # expect <exit-code> <substring> <check> [args...]
+  local want_code="$1"; shift
+  local want_text="$1"; shift
+  local name="$1"
+  local out
+  out="$("$PYTHON" "$CI_DIR/$@" 2>&1)"
+  local code=$?
+  if [ "$code" != "$want_code" ]; then
+    printf 'FAIL %s: exit %s, expected %s\n%s\n' "$name" "$code" "$want_code" "$out"
+    fail=$((fail + 1)); return
+  fi
+  if [ -n "$want_text" ] && ! printf '%s' "$out" | grep -qF -- "$want_text"; then
+    printf 'FAIL %s: output does not mention "%s"\n%s\n' "$name" "$want_text" "$out"
+    fail=$((fail + 1)); return
+  fi
+  printf 'ok   %s\n' "$name"
+  pass=$((pass + 1))
+}
+
+export GOVERNANCE_CONFIG="$FIX/config-default.yaml"
+
+# -- validate-manifest ------------------------------------------------------
+expect 0 "PASS" validate-manifest "$FIX/manifests/pass.yaml"
+expect 1 "vocabulary" validate-manifest "$FIX/manifests/bad-enum.yaml"
+
+# -- check-projections ------------------------------------------------------
+expect 0 "PASS" check-projections "$FIX/manifests/pass.yaml" --topics-file "$FIX/topics/good.txt"
+expect 1 "leaks into public GitHub topic" check-projections "$FIX/manifests/pass.yaml" --topics-file "$FIX/topics/leaked.txt"
+
+# -- check-tier-controls ----------------------------------------------------
+expect 0 "PASS" check-tier-controls "$FIX/manifests/pass.yaml"
+expect 1 "B1.2" check-tier-controls "$FIX/manifests/agent-tier1.yaml"
+expect 1 "B1.3" check-tier-controls "$FIX/manifests/regulated-tier2.yaml"
+expect 1 "B1.5" check-tier-controls "$FIX/manifests/local-tier2.yaml"
+
+# -- check-gate1 ------------------------------------------------------------
+expect 0 "PASS" check-gate1 "$FIX/manifests/pass.yaml"
+
+# -- check-preflight --------------------------------------------------------
+expect 0 "PASS" check-preflight "$FIX/manifests/pass.yaml"
+expect 1 "no evidence" check-preflight "$FIX/manifests/unevidenced.yaml"
+expect 1 "adversarial-stress-testing" check-preflight "$FIX/manifests/tier3-missing-extra.yaml"
+expect 1 "expired on" check-preflight "$FIX/manifests/expired-exception.yaml"
+expect 1 "records.spec" check-preflight "$FIX/manifests/no-spec.yaml"
+
+# -- check-evaluation -------------------------------------------------------
+expect 0 "PASS" check-evaluation "$FIX/manifests/pass.yaml"
+expect 1 "before results exist" check-evaluation "$FIX/manifests/eval-late-threshold.yaml"
+expect 1 "exceeds the acceptable_error_rate" check-evaluation "$FIX/manifests/eval-over-threshold.yaml"
+expect 1 "unacceptable error kind" check-evaluation "$FIX/manifests/eval-unacceptable-kind.yaml"
+
+# -- check-registry ([REF insert]: warn-only by default, enforced under the
+#    enforcing fixture config) ---------------------------------------------
+expect 0 "warn-only" check-registry --registry "$FIX/registries/bad-pattern.yaml"
+export GOVERNANCE_CONFIG="$FIX/config-enforcing.yaml"
+expect 1 "does not match" check-registry --registry "$FIX/registries/bad-pattern.yaml"
+expect 1 "duplicate asset_id" check-registry --registry "$FIX/registries/duplicate-id.yaml"
+expect 1 "append-only" check-registry --registry "$FIX/registries/rewritten-id.yaml" --base "$FIX/registries/base.yaml"
+
+# -- unconfigured tree ------------------------------------------------------
+export GOVERNANCE_CONFIG="$FIX/does-not-exist.yaml"
+expect 3 "cp config/governance.example.yaml" validate-manifest "$FIX/manifests/pass.yaml"
+
+printf '\n%d passed, %d failed\n' "$pass" "$fail"
+[ "$fail" -eq 0 ]

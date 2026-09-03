@@ -1,0 +1,171 @@
+# {{ORG_NAME}} — Naming & Tagging Vocabulary (canonical, machine-readable)
+#
+# This file is the authoritative source for the controlled values used in
+# repository names, governance manifests, AWS resource tags, and GitHub topics.
+# The human-readable standard lives in Confluence (AI Solution Standards); it
+# references THIS file for values rather than restating them. When the two
+# disagree, this file governs the values and Confluence governs the prose.
+#
+# Scope note: the repository grammar and the four workload types are
+# domain-general — they name all deployed workloads, AI or not. The manifest
+# overlay fields (asset_id, tier, track, shape, oversight, data_class) are
+# AI-governance-specific and apply to assets in scope of the Non-Product AI
+# Deployment Standard.
+#
+# ADOPTER SUBSTITUTION: {{ASSET_ID_PREFIX}} (default `ORG-AI-`),
+# {{TAG_NAMESPACE}} (default `org`), and {{DOC_ID_PREFIX}} (default `ORG`) must
+# be replaced with literal values before the `asset_id.pattern` regex below will
+# match anything. See the Configuration table in the root README.
+
+schema_version: 1.0.0            # SemVer of this vocabulary file itself
+owner: ai-org-management
+last_reviewed: 2026-07-14
+
+# ---------------------------------------------------------------------------
+# Repository naming grammar
+# ---------------------------------------------------------------------------
+repository_grammar:
+  org_management: "<vendor>-org-management"           # unchanged. Leading token is a
+                                                      # vendor (aws, snowflake, aiven)
+                                                      # or a governance domain (ai).
+  everything_else: "<domain>-<vendor>-<type>-<name>"  # <type> and <name> are optional
+
+  slots:
+    domain:
+      definition: "The business unit or functional area that owns the repository."
+      examples: [platform, data, finance, ops, legacy, dataops, ai]
+      required: true
+    vendor:
+      definition: "The platform the code targets or runs on."
+      examples: [aws, snowflake, aiven, claude, github, workato]
+      required: true
+    type:
+      definition: "Workload type (tool | platform | service | app)."
+      required: false
+    name:
+      definition: "Specific name; splits a complex codebase into typed repositories."
+      required: false
+      constraint: "Use only together with <type> — a positional grammar cannot place a name without a type."
+
+  # Optional <type>/<name> give the flexibility to break down a complex codebase:
+  #   simple:  ops-aws
+  #   split:   ops-aws-platform-networking, ops-aws-service-reporting, ops-aws-app-portal
+
+  rules:
+    - "lowercase letters, numbers, and hyphens only"
+    - "no invented abbreviations (write 'business-unit', not 'bu')"
+
+  # org-management leads with the vendor because it manages that vendor's org;
+  # every other repo leads with the owning domain, vendor second. This
+  # asymmetry is intentional, not an inconsistency.
+
+# ---------------------------------------------------------------------------
+# Workload type (structural axis — WHERE a thing sits in the dependency order)
+# ---------------------------------------------------------------------------
+workload_type:
+  description: >
+    Classifies an asset by dependency position, not by internal implementation.
+    Classify by the external contract a consumer depends on. Agentic behavior is
+    NOT a type; it is carried by 'shape'.
+  values:
+    tool:
+      definition: >
+        A standalone collection of libraries, utilities, or parameters consumed
+        by builders. Independent of apps, services, and platforms; nothing runs
+        on it as a service. Typically build-time, not a deployed runtime.
+      example: "a shared user-interface component library — libraries, tools, and parameters for user interfaces"
+    platform:
+      definition: >
+        Infrastructure or tooling that apps, services, and other workloads build
+        on. Depended-upon; app-agnostic. May be build-time or runtime.
+      example: "data-aws-platform, ops-claude-platform-ai, dataops-claude-platform-skills"
+    service:
+      definition: "Supplies data or information to apps. May use platform and tool."
+      example: "ops-aws-service-reporting"
+    app:
+      definition: >
+        Top-of-stack workload. May depend on platform, service, and tool; MUST
+        NOT depend on another app. Subtype names the product it delivers.
+      example: "finance-aws-app"
+      subtype: "<productName>"   # optional; free-form product identifier
+  dependency_order:
+    # left depends on nothing above it; app is the leaf
+    - "tool / platform"
+    - "service"
+    - "app"
+  invariants:
+    - "app MUST NOT depend on another app"
+    - "same-shape orchestration (agent depending on agent) is multi-agent and is gated behind Engineering + Security (Standard B1.2)"
+
+# ---------------------------------------------------------------------------
+# Shape (behavioral axis — HOW a thing decides). Orthogonal to workload_type.
+# Sourced from the AI Solution Standards, control B1.2.
+# ---------------------------------------------------------------------------
+shape:
+  description: "How the workload decides its next step. Independent of workload_type."
+  values:
+    workflow: "Fixed, pre-mapped steps."
+    agent: "Decides its own next step toward a goal. Raises the tier (B1.2)."
+    multi-agent: "Several agents under a coordinator. Gated behind Engineering + Security."
+
+# ---------------------------------------------------------------------------
+# AI-governance overlay vocabularies (apply to in-scope AI assets)
+# ---------------------------------------------------------------------------
+tier:                              # Standard B1.3 — worse of harm and independence
+  values: [1, 2, 3]
+  notes:
+    1: "Low — reversible, internal-only, no writes to an authoritative system, no regulated data."
+    2: "Moderate — writes to an authoritative system, faces outside the company, or moves money."
+    3: "High — regulated data, safety impact, irreversible, or customer-facing decisions."
+
+track:                             # Standard — paved roads / lanes
+  values: [a, b, local]
+  notes:
+    a: "Engineering-built, infrastructure-as-code; production / regulated / Tier 2-3."
+    b: "Internal, low-risk Tier 1."
+    local: "Single-machine local lane (Tier 1 only, B1.5)."
+
+oversight:                         # Standard B1.4 — kept as defined glossary terms
+  values: [hitl, hotl, autonomous]
+  notes:
+    hitl: "Human-in-the-loop — a person approves each important action first."
+    hotl: "Human-on-the-loop — runs while monitored and interruptible."
+    autonomous: "Read-only monitoring, no judgment calls, no external reliance."
+
+data_class:                        # maximum sensitivity the asset touches
+  values: [public, confidential, regulated]
+  notes:
+    regulated: "Regulated or personal data; requires Data/Privacy involvement."
+  caveat: "GitHub topics are public even on private repos — keep data_class coarse and never encode customer names, secrets, or ARR."
+
+lifecycle:                         # Standard B1.8 — retirement
+  values: [draft, active, deprecated, retired]
+
+# ---------------------------------------------------------------------------
+# Identifiers
+# ---------------------------------------------------------------------------
+asset_id:
+  grammar: "{{ASSET_ID_PREFIX}}<DOMAIN>-<SLUG>"
+  rules:
+    - "uppercase, hyphen-separated, immutable once minted"
+    - "mirrors the document-ID family (e.g. {{DOC_ID_PREFIX}}-STD-SSDLC-AGENTIC-001)"
+    - "minted for assets in scope of the Non-Product AI Deployment Standard"
+    - "survives repository renames; the stable handle referenced by Requirements, Spec, and Epic"
+  # SUBSTITUTION REQUIRED: replace {{ASSET_ID_PREFIX}} below with the literal
+  # prefix (e.g. `ORG-AI-`) before this regex can validate an asset_id.
+  pattern: "^{{ASSET_ID_PREFIX}}[A-Z0-9]+(-[A-Z0-9]+)+$"
+
+version:
+  standard: "SemVer 2.0.0 (MAJOR.MINOR.PATCH)"   # already a Required Control
+  note: "Every in-scope solution and governed record carries a SemVer; each increment is recorded in the record's changelog."
+
+# ---------------------------------------------------------------------------
+# Tag-key / topic prefixes
+# SUBSTITUTION REQUIRED: replace {{TAG_NAMESPACE}} with the literal namespace
+# (e.g. `org`) before any projection or CI check can compare against real tags.
+# ---------------------------------------------------------------------------
+prefixes:
+  aws_tag_key: "{{TAG_NAMESPACE}}:"      # AWS-recommended org-prefix + colon convention
+  github_topic_general: "{{TAG_NAMESPACE}}-"       # domain-general facets (e.g. workload type)
+  github_topic_ai_governance: "{{TAG_NAMESPACE}}-ai-"   # AI-governance facets (tier, shape, ...)
+  inventory_marker_topic: "{{TAG_NAMESPACE}}-ai-governed"   # answers "in scope of the AI standard?"

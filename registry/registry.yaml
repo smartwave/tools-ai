@@ -1,0 +1,38 @@
+# Asset-ID registry (seed) — the {{ASSET_ID_PREFIX}}* namespace
+#
+# One entry per in-scope AI asset. The asset_id is minted here and is immutable.
+# This registry answers "does this ID exist / what is it / where does it live."
+# It is the machine-readable companion to the AI asset inventory.
+#
+# Minting rule: an asset_id is created when an asset comes in scope of the
+# Non-Product AI Deployment Standard (Gate 1 / requirements approved). IDs are
+# never reused or reassigned; retire in place (lifecycle: retired).
+#
+# SUBSTITUTION REQUIRED: replace {{ASSET_ID_PREFIX}} with the adopter's literal
+# prefix (default `ORG-AI-`) before CI can pattern-check these ids.
+#
+# The single row below is the illustrative seed that examples/manifest.example.yaml
+# is written against. Replace it with the adopter's first real asset; do not
+# accumulate fictional rows in an append-only inventory.
+
+registry:
+  - asset_id: "{{ASSET_ID_PREFIX}}DATAOPS-PIPELINE-MONITOR"
+    name: dataops-pipeline-monitor
+    workload_type: tool
+    domain: dataops
+    vendor: claude
+    lives_in:
+      authoring: dataops-claude-platform-skills   # example home
+      deployment: null                            # runs in the Claude lane
+    lifecycle: active
+
+  # Template for new entries:
+  # - asset_id: {{ASSET_ID_PREFIX}}<DOMAIN>-<SLUG>
+  #   name: <lowercase-slug>
+  #   workload_type: tool | platform | service | app
+  #   domain: <business unit or functional area>
+  #   vendor: <platform it runs on>
+  #   lives_in:
+  #     authoring: <domain-vendor-... repo or null>
+  #     deployment: <domain-vendor-... repo or null>
+  #   lifecycle: draft | active | deprecated | retired

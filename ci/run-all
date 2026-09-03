@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+"""run-all — every governance check, in dependency order.
+
+Usage: ci/run-all [<manifest> ...]
+
+With no arguments the subjects are every assets/<asset_id>/manifest.yaml plus
+examples/manifest.example.yaml, which is always warn-only (it is an
+illustration, not a governed asset).
+
+Exits 0 when nothing is configured yet: a generic clone of this toolkit must
+stay green until an adopter copies config/governance.example.yaml.
+"""
+
+import glob
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import governance as gov
+from lib.config import NotConfigured, load_config
+from lib.report import EXIT_OK, EXIT_VIOLATION
+
+CI_DIR = os.path.dirname(os.path.abspath(__file__))
+EXAMPLE = os.path.join(gov.REPO_ROOT, "examples", "manifest.example.yaml")
+
+# Dependency order: shape first, then registration, then tier, then the gates
+# that build on it.
+PER_MANIFEST = [
+    "validate-manifest",
+    "check-projections",
+    "check-tier-controls",
+    "check-gate1",
+    "check-evaluation",
+    "check-preflight",
+]
+
+
+def subjects(argv):
+    if argv:
+        return [(path, False) for path in argv]
+    found = sorted(glob.glob(os.path.join(gov.ASSETS_DIR, "*", "manifest.yaml")))
+    found = [(path, False) for path in found]
+    if os.path.exists(EXAMPLE):
+        found.append((EXAMPLE, True))
+    return found
+
+
+def run(check, *args):
+    result = subprocess.run([sys.executable, os.path.join(CI_DIR, check)] + list(args),
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = result.stdout.decode("utf-8", "replace")
+    sys.stdout.write(output)
+    if result.returncode == 0:
+        status = "warn" if "  WARN " in output else "pass"
+    elif result.returncode == 3:
+        status = "n/c"
+    else:
+        status = "fail"
+    return status
+
+
+def main():
+    argv = [a for a in sys.argv[1:] if not a.startswith("-")]
+    try:
+        load_config()
+    except NotConfigured as exc:
+        sys.stdout.write("run-all: %s\n" % exc)
+        sys.stdout.write("run-all: nothing checked — a generic clone stays green.\n")
+        return EXIT_OK
+
+    rows = []
+    failed = False
+
+    status = run("check-registry")
+    rows.append(("check-registry", "registry/registry.yaml", status))
+    failed = failed or status == "fail"
+
+    for path, warn_only in subjects(argv):
+        label = os.path.relpath(path, gov.REPO_ROOT)
+        for check in PER_MANIFEST:
+            status = run(check, path)
+            if warn_only and status == "fail":
+                status = "warn (example)"
+            rows.append((check, label, status))
+            failed = failed or status == "fail"
+
+    width_check = max(len(row[0]) for row in rows)
+    width_subject = max(len(row[1]) for row in rows)
+    sys.stdout.write("\n%s  %s  %s\n" % ("CHECK".ljust(width_check),
+                                         "SUBJECT".ljust(width_subject), "RESULT"))
+    sys.stdout.write("%s  %s  %s\n" % ("-" * width_check, "-" * width_subject, "------"))
+    for check, subject, status in rows:
+        sys.stdout.write("%s  %s  %s\n" % (check.ljust(width_check),
+                                           subject.ljust(width_subject), status))
+    return EXIT_VIOLATION if failed else EXIT_OK
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# pull-page — capture a live Confluence page body into a repo source (bootstrap)
+#
+# One-time (or occasional) tool to seed confluence/pages/<page-name>.md from
+# the API faithfully, so the first sync is a near no-op and no body is hand-transcribed.
+#
+# Usage:
+#   CONFLUENCE_BASE_URL=https://{{WIKI_HOST}}/wiki \
+#   CONFLUENCE_USER=svc-confluence@{{ORG_DOMAIN}} \
+#   CONFLUENCE_TOKEN=*** \
+#   ci/pull-page <pageId> [--format markdown|storage] > body.md
+#
+# Notes:
+#   - --format storage returns Confluence's exact XHTML storage format (highest
+#     fidelity for round-trip); markdown is easier to edit but lossy.
+#   - Add the YAML front matter (page_id, space, title, owner, sync) yourself;
+#     this prints the body only.
+#   - Secrets come from the environment / an approved store — never hard-code.
+
+set -euo pipefail
+
+PAGE_ID="${1:-}"
+FORMAT="storage"
+[ "${2:-}" = "--format" ] && FORMAT="${3:-storage}"
+
+: "${CONFLUENCE_BASE_URL:?set CONFLUENCE_BASE_URL}"
+: "${CONFLUENCE_USER:?set CONFLUENCE_USER}"
+: "${CONFLUENCE_TOKEN:?set CONFLUENCE_TOKEN}"
+[ -n "$PAGE_ID" ] || { echo "usage: pull-page <pageId> [--format markdown|storage]" >&2; exit 2; }
+
+# Confluence Cloud REST API v2: GET /pages/{id}?body-format=storage
+curl -fsSL \
+  --user "${CONFLUENCE_USER}:${CONFLUENCE_TOKEN}" \
+  -H "Accept: application/json" \
+  "${CONFLUENCE_BASE_URL}/api/v2/pages/${PAGE_ID}?body-format=${FORMAT}" \
+| python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["body"][list(d["body"].keys())[0]]["value"])'

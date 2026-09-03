@@ -1,0 +1,115 @@
+name: confluence-sync
+
+# Publish full-page sources in confluence/pages/ to Confluence on merge.
+#
+# ADOPTER CONFIGURATION — set these before enabling the workflow:
+#   Environment `confluence-publish` (recommended: add required reviewers)
+#     secret CONFLUENCE_USER   — email of a dedicated Confluence service account
+#     secret CONFLUENCE_TOKEN  — that account's scoped API token (write-content only)
+#   Repository / environment variables
+#     var CONFLUENCE_BASE_URL  — https://{{WIKI_HOST}}/wiki
+#     var CONFLUENCE_DRY_RUN   — leave unset (or "true") until fidelity is verified
+#   Page ids come from each source's front matter ({{PAGE_ID_AI_STANDARDS}},
+#   {{PAGE_ID_AGENTIC_SDLC}}); the space key is {{WIKI_SPACE_KEY}}.
+#
+# Governance model: the reviewed PR to main IS the change-control gate (B1.6 —
+# accepted by someone other than the builder). CODEOWNERS enforces that each
+# page's required reviewer (its owner) approves before merge. GitHub is
+# authoritative; Confluence is the projection.
+#
+# SAFETY DEFAULTS:
+#   - DRY_RUN defaults to true. The job renders and reports the diff but does NOT
+#     write to Confluence until you set the repo/environment variable
+#     CONFLUENCE_DRY_RUN=false (do this only after verifying fidelity per
+#     confluence/pages/README.md).
+#   - Only sources with front matter `sync: true` are published.
+#   - Secrets come from the `confluence-publish` environment; add a required-
+#     reviewers protection rule on that environment for an extra human gate.
+
+on:
+  push:
+    branches: [main]
+    paths: ["confluence/pages/**"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Render and diff only; do not write to Confluence"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: confluence-sync
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: confluence-publish   # scope secrets here; add required reviewers for a manual gate
+    env:
+      CONFLUENCE_BASE_URL: ${{ vars.CONFLUENCE_BASE_URL }}       # e.g. https://{{WIKI_HOST}}/wiki
+      CONFLUENCE_USER: ${{ secrets.CONFLUENCE_USER }}            # dedicated service account email
+      CONFLUENCE_TOKEN: ${{ secrets.CONFLUENCE_TOKEN }}          # scoped API token (write-content only)
+      # Precedence: workflow_dispatch input > repo/env var (default true).
+      DRY_RUN: ${{ github.event.inputs.dry_run || vars.CONFLUENCE_DRY_RUN || 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need history to diff the changed page sources
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install converter
+        # md2cf converts Markdown and updates a Confluence page by id.
+        # NOTE: pin an exact version and have it pass the standard's tool/Security
+        # review before this workflow goes live (it holds a write token).
+        run: pip install "md2cf==2.3.0" "PyYAML==6.0.2"
+
+      - name: Determine changed page sources
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            BASE="${{ github.event.before }}"
+            # First push / unknown base: fall back to the single latest commit.
+            if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then BASE="${{ github.sha }}^"; fi
+            git diff --name-only "$BASE" "${{ github.sha }}" -- 'confluence/pages/*.md' > changed.txt || true
+          else
+            git ls-files 'confluence/pages/*.md' > changed.txt
+          fi
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"; cat changed.txt >> "$GITHUB_OUTPUT"; echo "EOF" >> "$GITHUB_OUTPUT"
+          cat changed.txt
+
+      - name: Render / publish
+        if: steps.changed.outputs.files != ''
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ -f "$f" ] || continue
+            # Parse front matter (between the first two --- lines).
+            fm=$(awk 'NR==1&&/^---$/{p=1;next} p&&/^---$/{exit} p{print}' "$f")
+            page_id=$(printf '%s\n' "$fm" | python3 -c 'import sys,yaml; print((yaml.safe_load(sys.stdin) or {}).get("page_id",""))')
+            sync=$(printf   '%s\n' "$fm" | python3 -c 'import sys,yaml; print((yaml.safe_load(sys.stdin) or {}).get("sync",False))')
+            if [ "$sync" != "True" ]; then echo "skip (sync:false): $f"; continue; fi
+            if [ -z "$page_id" ]; then echo "::error file=$f::missing page_id in front matter"; exit 1; fi
+            # Strip front matter to get the body to publish.
+            body=$(mktemp --suffix=.md)
+            awk 'NR==1&&/^---$/{p=1;next} p&&/^---$/{p=0;next} !p{print}' "$f" > "$body"
+
+            if [ "$DRY_RUN" = "false" ]; then
+              echo "PUBLISH -> page $page_id  (from $f)"
+              md2cf --host "$CONFLUENCE_BASE_URL" --username "$CONFLUENCE_USER" --token "$CONFLUENCE_TOKEN" \
+                    --page-id "$page_id" \
+                    --minor-edit --message "Sync from ${GITHUB_SHA} via confluence-sync" \
+                    "$body"
+              # NOTE: verify these md2cf flags against the installed version's --help;
+              # md2cf handles the version-number increment on update.
+            else
+              echo "DRY RUN -> would publish page $page_id from $f (first 40 lines):"
+              head -40 "$body"
+            fi
+          done < changed.txt

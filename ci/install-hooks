@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# install-hooks — optional pre-commit hook running the fast checks on staged files.
+#
+# Usage: ci/install-hooks
+#
+# Installs .git/hooks/pre-commit, which runs check-registry and
+# validate-manifest against staged manifests only. The full ci/run-all stays
+# manual and CI-side. Never auto-installed: run this yourself if you want it.
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+hook="$repo_root/.git/hooks/pre-commit"
+
+if [ ! -d "$repo_root/.git" ]; then
+  echo "install-hooks: $repo_root is not a git working tree." >&2
+  exit 1
+fi
+
+if [ -e "$hook" ]; then
+  echo "install-hooks: $hook already exists — not overwriting it." >&2
+  exit 1
+fi
+
+cat > "$hook" <<'HOOK'
+#!/usr/bin/env bash
+# Installed by ci/install-hooks. Fast path only: staged manifests + the registry.
+set -euo pipefail
+repo_root="$(git rev-parse --show-toplevel)"
+staged="$(git diff --cached --name-only --diff-filter=ACM)"
+
+status=0
+if printf '%s\n' "$staged" | grep -q '^registry/registry.yaml$'; then
+  "$repo_root/ci/check-registry" || status=$?
+fi
+manifests="$(printf '%s\n' "$staged" | grep -E '(^|/)manifest[^/]*\.ya?ml$' || true)"
+if [ -n "$manifests" ]; then
+  # shellcheck disable=SC2086
+  (cd "$repo_root" && ./ci/validate-manifest $manifests) || status=$?
+fi
+exit $status
+HOOK
+
+chmod +x "$hook"
+echo "install-hooks: installed $hook"

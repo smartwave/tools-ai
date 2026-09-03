@@ -1,0 +1,42 @@
+# Example governance manifest — validates against manifest.schema.json
+# Internal DataOps tooling; illustrative values only.
+#
+# SUBSTITUTION REQUIRED: this example validates once {{ASSET_ID_PREFIX}} and
+# {{TAG_NAMESPACE}} are replaced with literal values here and in the schema.
+
+asset_id: "{{ASSET_ID_PREFIX}}DATAOPS-PIPELINE-MONITOR"
+name: dataops-pipeline-monitor
+version: 1.2.0
+scope: non-product
+workload_type: tool            # a self-contained skill; nothing runs on it
+shape: workflow                # fixed steps, not self-directing
+tier: 2                        # writes to an authoritative tracker
+track: b                       # internal, low-risk lane
+oversight: hotl                # runs while monitored, reversible, checkable
+data_class: confidential
+owner: "{{SOLUTION_OWNER}}"    # Solution Owner (Accountable) — a person, not a team
+lifecycle: active
+business_unit: dataops         # the <domain> slot
+vendor: claude                 # the <vendor> slot — runs in the Claude lane
+records:
+  requirements: https://{{WIKI_HOST}}/wiki/spaces/{{WIKI_SPACE_KEY}}/pages/<requirements-page>
+  spec: https://{{WIKI_HOST}}/wiki/spaces/{{WIKI_SPACE_KEY}}/pages/<spec-page>
+  epic: "{{TICKET_REF}}"       # work-tracker Epic key (Jira in the reference configuration)
+mcp_servers:
+  - metabase
+  - atlassian
+
+# --- A deployed agent would instead look like: ---
+# asset_id: {{ASSET_ID_PREFIX}}OPS-REQUEST-TRIAGE
+# name: ops-request-triage
+# workload_type: app
+# workload_subtype: request-triage
+# shape: agent
+# tier: 3
+# track: a
+# oversight: hitl
+# business_unit: ops
+# vendor: aws
+# Deployed IaC lives in the repo   ops-aws-app-request-triage.
+# Its authoring assets (skills, prompts) live in an  ops-claude-*  repo and
+# carry the SAME asset_id (source vs runtime, one grammar).

@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""check-tier-controls — assert a manifest against its tier row.
+
+Usage: ci/check-tier-controls <manifest> [...]
+
+Resolves the effective tier (modifiers first, then the tier row, exactly as
+policy/tier-controls.yaml says to read it) and asserts the row: allowed tracks
+and oversight, required records, and every invariant decidable from the
+manifest and the registry. Rules that exist but cannot be decided from the
+available data are printed as "not machine-checkable" so silence never reads
+as coverage. security_triggers that fire are routing notices, not failures.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import governance as gov
+from lib.cli import run
+from lib.config import load_config
+from lib.report import EXIT_OK, Report
+
+INSERT = "REF insert"
+
+
+def check(path, config, policy, registry_ids):
+    manifest = gov.load_manifest(path, config)
+    report = Report("check-tier-controls", path, config)
+
+    tier, declared, reasons = gov.effective_tier(manifest, policy)
+    for control, reason in reasons:
+        if isinstance(declared, int) and declared < tier:
+            report.fail(control,
+                        "%s: declared tier %s is below the minimum this manifest "
+                        "forces — %s" % (path, declared, reason))
+        else:
+            report.notice("effective tier %d: %s" % (tier, reason))
+    if declared is not None and isinstance(declared, int) and declared > tier:
+        report.notice("declared tier %d is above the forced minimum %d "
+                      "(tier-up is always allowed)" % (declared, tier))
+    report.notice("effective tier: %d" % tier)
+
+    row = gov.tier_row(tier, policy)
+    if not row:
+        report.fail("B1.3", "%s: no tier row for effective tier %s in "
+                            "policy/tier-controls.yaml" % (path, tier))
+        return report
+
+    # Closed sets.
+    track = manifest.get("track")
+    allowed_tracks = row.get("allowed_tracks") or []
+    if track is not None and track not in allowed_tracks:
+        # The local lane is a Required Control (B1.5); the other lanes are the
+        # "use the paved roads" Recommended Pattern, so they report warn-only.
+        control, provenance = ("B1.5", "REF") if track == "local" else ("B1.3", "REC")
+        report.fail(control, "%s: track '%s' is not allowed at tier %d %s"
+                    % (path, track, tier, allowed_tracks), provenance)
+
+    oversight = manifest.get("oversight")
+    allowed_oversight = row.get("allowed_oversight") or []
+    if oversight is not None and oversight not in allowed_oversight:
+        report.fail("B1.4", "%s: oversight '%s' is not allowed at tier %d %s"
+                    % (path, oversight, tier, allowed_oversight))
+
+    # Oversight rules: only the conditions the manifest actually carries.
+    for name, rule in (policy.get("oversight_rules") or {}).items():
+        for key in ("required_when", "permitted_only_when", "never_when"):
+            if rule.get(key):
+                report.unknowable(
+                    "B1.4", "oversight_rules.%s.%s %s — the manifest carries no "
+                            "such facts" % (name, key, rule[key]))
+
+    # Required records.
+    records = manifest.get("records") or {}
+    for record in row.get("required_records") or []:
+        if not records.get(record):
+            report.fail("B1.9", "%s: tier %d requires records.%s"
+                        % (path, tier, record))
+    for record in row.get("recommended_records") or []:
+        if not records.get(record):
+            report.warn("B1.9", "%s: records.%s is recommended at tier %d"
+                        % (path, record, tier))
+
+    # Invariants.
+    asset_id = manifest.get("asset_id")
+    for invariant in policy.get("invariants") or []:
+        ident = invariant.get("id")
+        rule = invariant.get("rule")
+        if ident == "local-tier-1-only":
+            if track == "local" and tier > 1:
+                report.fail("B1.5", "%s: %s (effective tier %d)" % (path, rule, tier))
+        elif ident == "agent-raises-tier":
+            if manifest.get("shape") == "agent" and isinstance(declared, int) and declared < 2:
+                report.fail("B1.2", "%s: %s (declared tier %s)" % (path, rule, declared))
+        elif ident == "tier-2-plus-manifest":
+            if tier >= 2:
+                report.ok(INSERT, rule)
+        elif ident == "id-at-gate-1":
+            if asset_id and asset_id not in registry_ids:
+                report.fail(INSERT, "%s: %s — '%s' is not in registry/registry.yaml"
+                            % (path, rule, asset_id), INSERT)
+        elif ident == "multi-agent-gate":
+            if manifest.get("shape") == "multi-agent":
+                report.notice("multi-agent: Engineering and Security must both be "
+                              "involved before build (B1.2)")
+                report.unknowable("B1.2", rule)
+        elif ident == "no-app-on-app":
+            depends = manifest.get("depends_on")
+            if depends is None:
+                report.unknowable("vocabulary", "%s — the manifest declares no "
+                                                "dependencies" % rule)
+            else:
+                report.unknowable("vocabulary", "%s — dependency types are not "
+                                                "resolvable offline" % rule)
+        else:
+            report.unknowable(ident or "invariant", rule)
+
+    # Security triggers are routing notices, not failures.
+    if manifest.get("mcp_servers"):
+        report.notice("security trigger 'mcp-server-or-connector-in-use': "
+                      "connectors %s — Security reviews the connector and its scope"
+                      % list(manifest["mcp_servers"]))
+    if manifest.get("shape") == "multi-agent":
+        report.notice("security trigger 'multi-agent-solution': Engineering + "
+                      "Security involvement required")
+    if (manifest.get("data_class") == "regulated"):
+        report.notice("data_class 'regulated': Data/Privacy must be involved (Roles)")
+
+    if not report.failures:
+        report.ok("B1.3", "satisfies the tier %d row" % tier)
+    return report
+
+
+def main():
+    paths = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not paths:
+        sys.stderr.write("usage: ci/check-tier-controls <manifest> [...]\n")
+        return 1
+    config = load_config()
+    policy = gov.tier_controls()
+    registry_ids = set(e.get("asset_id") for e in gov.registry(config))
+
+    code = EXIT_OK
+    for path in paths:
+        report = check(path, config, policy, registry_ids)
+        report.render()
+        code = code or report.exit_code
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(run(main))

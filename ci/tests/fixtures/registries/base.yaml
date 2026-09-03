@@ -1,0 +1,5 @@
+# Fixture: the registry as it stood at the base ref.
+registry:
+  - asset_id: "ORG-AI-DATAOPS-PIPELINE-MONITOR"
+    name: dataops-pipeline-monitor
+    lifecycle: active

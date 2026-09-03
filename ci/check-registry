@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""check-registry — registry/registry.yaml invariants.
+
+Usage: ci/check-registry [--base <git-ref-or-file>] [--registry <path>]
+
+Asserts:
+  - every asset_id matches ^<prefix>[A-Z0-9]+(-[A-Z0-9]+)+$ (prefix resolved
+    from the adopter configuration);
+  - asset_ids are unique;
+  - append-only: no id present in the base ref was removed or rewritten.
+    lifecycle changes (e.g. to `retired`) are permitted; id strings are not.
+
+The registry format itself is [REF insert] — the id pattern and append-only
+rules only fail the build when enforce_pending_insert is true; otherwise they
+report warn-only.
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import governance as gov
+from lib.cli import run
+from lib.config import load_config
+from lib.loader import where
+from lib.report import Report
+
+import yaml
+
+INSERT = "REF insert"
+
+
+def base_registry_ids(base):
+    """asset_ids in the registry at `base`, or None when it is unavailable
+    (a shallow clone, a fresh repo, or no git).
+
+    `base` is normally a git ref; a path to a registry file on disk also works,
+    which is how the fixture suite exercises the append-only rule.
+    """
+    if os.path.exists(base):
+        data = yaml.safe_load(open(base).read()) or {}
+        return [e.get("asset_id") for e in (data.get("registry") or [])]
+    rel = os.path.relpath(gov.REGISTRY_PATH, gov.REPO_ROOT)
+    try:
+        blob = subprocess.check_output(
+            ["git", "show", "%s:%s" % (base, rel)],
+            cwd=gov.REPO_ROOT, stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    data = yaml.safe_load(blob.decode("utf-8")) or {}
+    return [e.get("asset_id") for e in (data.get("registry") or [])]
+
+
+def default_base():
+    for ref in ("origin/main", "origin/master"):
+        try:
+            subprocess.check_output(["git", "rev-parse", "--verify", ref],
+                                    cwd=gov.REPO_ROOT, stderr=subprocess.DEVNULL)
+            return ref
+        except (subprocess.CalledProcessError, OSError):
+            continue
+    return None
+
+
+def main():
+    base = None
+    registry_path = gov.REGISTRY_PATH
+    args = sys.argv[1:]
+    for flag, setter in (("--base", "base"), ("--registry", "registry")):
+        if flag in args:
+            index = args.index(flag)
+            if index + 1 >= len(args):
+                sys.stderr.write("usage: ci/check-registry [--base <git-ref>] "
+                                 "[--registry <path>]\n")
+                return 1
+            if setter == "base":
+                base = args[index + 1]
+            else:
+                registry_path = args[index + 1]
+
+    config = load_config()
+    report = Report("check-registry", registry_path, config)
+
+    entries = gov.registry(config, registry_path)
+    pattern = re.compile("^%s[A-Z0-9]+(-[A-Z0-9]+)+$"
+                         % re.escape(config.asset_id_prefix))
+
+    seen = {}
+    for entry in entries:
+        asset_id = entry.get("asset_id")
+        if not asset_id:
+            report.fail(INSERT, "%s: registry entry without an asset_id"
+                        % registry_path, INSERT)
+            continue
+        if not pattern.match(str(asset_id)):
+            report.fail(INSERT, "%s: asset_id '%s' does not match %s"
+                        % (where(registry_path, asset_id), asset_id,
+                           pattern.pattern), INSERT)
+        if asset_id in seen:
+            report.fail(INSERT, "%s: duplicate asset_id '%s'"
+                        % (where(registry_path, asset_id), asset_id), INSERT)
+        seen[asset_id] = entry
+
+    # Append-only.
+    if base is None and registry_path != gov.REGISTRY_PATH:
+        report.notice("append-only check skipped: --registry points at %s and no "
+                      "--base was given" % registry_path)
+    else:
+        base = base or default_base()
+    if base is None:
+        report.notice("append-only check skipped: no base ref available "
+                      "(pass --base <git-ref> to enable it)")
+    else:
+        previous = base_registry_ids(base)
+        if previous is None:
+            report.notice("append-only check skipped: registry/registry.yaml "
+                          "not readable at %s" % base)
+        else:
+            for asset_id in previous:
+                resolved = config.resolve(asset_id)
+                if resolved not in seen:
+                    report.fail(INSERT,
+                                "asset_id '%s' present at %s is missing now — "
+                                "the registry is append-only; retire in place "
+                                "(lifecycle: retired) instead"
+                                % (resolved, base), INSERT)
+            if not report.failures:
+                report.ok(INSERT, "append-only against %s" % base)
+
+    report.render()
+    return report.exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(run(main))

@@ -1,0 +1,8 @@
+# Fixture config: same defaults as config/governance.example.yaml, but with the
+# pending naming/tagging insert enforced so the [REF insert] rules (asset_id
+# pattern, uniqueness, append-only) actually fail in the test suite.
+org_name: "Example Org"
+asset_id_prefix: "ORG-AI-"
+tag_namespace: "org"
+doc_id_prefix: "ORG"
+enforce_pending_insert: true

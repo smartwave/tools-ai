@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""check-gate1 — Gate 1 (requirements approved, before build begins).
+
+Usage: ci/check-gate1 <manifest> [...]
+
+Tier 2+ (Tier 1 warns, per B1.9 where the Epic is recommended rather than
+required): the approved Requirements and the Epic must both be linked in the
+manifest, and the asset_id must already be minted in registry/registry.yaml.
+The minting criterion is [REF insert] and so is warn-only until the adopter
+sets enforce_pending_insert.
+
+Gate definition: `gate-1` in policy/gates.yaml.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import governance as gov
+from lib.cli import run
+from lib.config import load_config
+from lib.report import EXIT_OK, Report
+
+INSERT = "REF insert"
+
+# Which gate-1 `produces` item each manifest record evidences.
+RECORD_FOR_PRODUCT = {
+    "approved-requirements": "requirements",
+    "jira-epic-opened": "epic",
+}
+
+
+def check(path, config, policy, gate, registry_ids):
+    manifest = gov.load_manifest(path, config)
+    report = Report("check-gate1", path, config)
+    tier, _, _ = gov.effective_tier(manifest, policy)
+    records = manifest.get("records") or {}
+    tier_1 = tier < 2
+
+    for product in gate.get("produces") or []:
+        record = RECORD_FOR_PRODUCT.get(product)
+        if record:
+            if records.get(record):
+                continue
+            message = ("%s: gate-1 produces '%s' — records.%s is missing"
+                       % (path, product, record))
+            if tier_1:
+                report.warn("B1.9", message + " (recommended at tier 1)")
+            else:
+                report.fail("B1.9", message)
+        elif product == "asset-id-minted":
+            asset_id = manifest.get("asset_id")
+            if not asset_id or asset_id not in registry_ids:
+                report.fail(INSERT,
+                            "%s: gate-1 produces 'asset-id-minted' — '%s' is not "
+                            "in registry/registry.yaml" % (path, asset_id), INSERT)
+        else:
+            report.unknowable("gate-1", "produces '%s'" % product)
+
+    for criterion in gate.get("exit_criteria") or []:
+        report.notice("gate-1 exit criterion: %s" % criterion)
+
+    if not report.failures:
+        report.ok("gate-1", "requirements and epic linked (effective tier %d)" % tier)
+    return report
+
+
+def main():
+    paths = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not paths:
+        sys.stderr.write("usage: ci/check-gate1 <manifest> [...]\n")
+        return 1
+    config = load_config()
+    policy = gov.tier_controls()
+    gate = gov.gates().get("gate-1") or {}
+    registry_ids = set(e.get("asset_id") for e in gov.registry(config))
+
+    code = EXIT_OK
+    for path in paths:
+        report = check(path, config, policy, gate, registry_ids)
+        report.render()
+        code = code or report.exit_code
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(run(main))

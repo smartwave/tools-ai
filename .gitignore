@@ -1,0 +1,7 @@
+.DS_Store
+.obsidian/
+AI-README.md
+AI-Tools.md
+
+# Adopter-specific governance config (see config/governance.example.yaml)
+config/governance.yaml

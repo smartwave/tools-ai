@@ -1,0 +1,62 @@
+# Fixture pre-flight evidence (B1.7). Item ids come from policy/gates.yaml.
+items:
+  - item: goal-defined-to-root-cause
+    status: met
+    evidence: https://wiki.example/evidence/goal-defined-to-root-cause
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: data-labeled-and-least-privilege-access
+    status: met
+    evidence: https://wiki.example/evidence/data-labeled-and-least-privilege-access
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: model-and-version-fixed-prompts-tracked
+    status: met
+    evidence: https://wiki.example/evidence/model-and-version-fixed-prompts-tracked
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: approved-tools-only
+    status: met
+    evidence: ""
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: correct-result-defined-and-tested-including-edge-cases
+    status: met
+    evidence: https://wiki.example/evidence/correct-result-defined-and-tested-including-edge-cases
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: guardrails-check-input-and-output-with-spend-and-rate-caps
+    status: met
+    evidence: https://wiki.example/evidence/guardrails-check-input-and-output-with-spend-and-rate-caps
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: monitoring-of-quality-and-drift
+    status: met
+    evidence: https://wiki.example/evidence/monitoring-of-quality-and-drift
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: decisions-logged-reconstructably
+    status: met
+    evidence: https://wiki.example/evidence/decisions-logged-reconstructably
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: one-person-named-accountable
+    status: met
+    evidence: https://wiki.example/evidence/one-person-named-accountable
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: threat-modeled-against-owasp-top-10-agentic-2026
+    status: exception
+    evidence: https://wiki.example/exception-log
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: documented-rollback-and-retirement-path
+    status: met
+    evidence: https://wiki.example/evidence/documented-rollback-and-retirement-path
+    checked_by: Dana Example
+    date: "2026-03-02"
+  - item: solution-spec-exists
+    status: met
+    evidence: https://wiki.example/evidence/solution-spec-exists
+    checked_by: Dana Example
+    date: "2026-03-02"

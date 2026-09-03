@@ -1,0 +1,92 @@
+# Fixture: the threshold was declared AFTER the results existed — the ordering
+# failure check-evaluation must catch.
+owner: Robin Business-Owner      # the business owner, not the builder
+scoring_method: rubric-scored by the owner, one point per case
+rubric: rubric.md
+acceptable_error_rate: 0.05
+error_rate_reasoning: >
+  A wrong routing suggestion costs one minute of rework; one in twenty is
+  cheaper than the manual process it replaces.
+unacceptable_error_kinds: [silent-data-loss, wrong-recipient]
+declared_date: "2026-04-01"
+cases:
+  - id: case-01
+    input: "example input 1"
+    expected: "example expected 1"
+    kind: routine
+  - id: case-02
+    input: "example input 2"
+    expected: "example expected 2"
+    kind: edge
+  - id: case-03
+    input: "example input 3"
+    expected: "example expected 3"
+    kind: ambiguous
+  - id: case-04
+    input: "example input 4"
+    expected: "example expected 4"
+    kind: insufficient-information
+  - id: case-05
+    input: "example input 5"
+    expected: "example expected 5"
+    kind: known-hard
+  - id: case-06
+    input: "example input 6"
+    expected: "example expected 6"
+    kind: routine
+  - id: case-07
+    input: "example input 7"
+    expected: "example expected 7"
+    kind: edge
+  - id: case-08
+    input: "example input 8"
+    expected: "example expected 8"
+    kind: ambiguous
+  - id: case-09
+    input: "example input 9"
+    expected: "example expected 9"
+    kind: insufficient-information
+  - id: case-10
+    input: "example input 10"
+    expected: "example expected 10"
+    kind: known-hard
+  - id: case-11
+    input: "example input 11"
+    expected: "example expected 11"
+    kind: routine
+  - id: case-12
+    input: "example input 12"
+    expected: "example expected 12"
+    kind: edge
+  - id: case-13
+    input: "example input 13"
+    expected: "example expected 13"
+    kind: ambiguous
+  - id: case-14
+    input: "example input 14"
+    expected: "example expected 14"
+    kind: insufficient-information
+  - id: case-15
+    input: "example input 15"
+    expected: "example expected 15"
+    kind: known-hard
+  - id: case-16
+    input: "example input 16"
+    expected: "example expected 16"
+    kind: routine
+  - id: case-17
+    input: "example input 17"
+    expected: "example expected 17"
+    kind: edge
+  - id: case-18
+    input: "example input 18"
+    expected: "example expected 18"
+    kind: ambiguous
+  - id: case-19
+    input: "example input 19"
+    expected: "example expected 19"
+    kind: insufficient-information
+  - id: case-20
+    input: "example input 20"
+    expected: "example expected 20"
+    kind: known-hard

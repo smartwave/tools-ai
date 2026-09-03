@@ -1,0 +1,25 @@
+# Open Items — collector config
+#
+# Install to ~/.open-items/config.yaml
+#
+# This is the only global file in the design. It changes when you add a new
+# CATEGORY of location — maybe twice a year — not when you start a project.
+# Ledgers are discovered by filename (OPEN-ITEMS.md); there is no registry.
+
+# Directories the collector walks looking for OPEN-ITEMS.md.
+# Keep these broad enough that new scopes are found without editing this file.
+scan_roots:
+  - <scan-root>
+
+# Glob patterns to skip. .git, node_modules, _archive and __pycache__ are always
+# skipped regardless of what is listed here.
+exclude:
+  - "**/Downloads/**"
+
+# Where rollup.md and rollup.json are written.
+output_dir: ~/.open-items
+
+# Additional copies of rollup.md. Point one at your vault so the rollup renders
+# in Obsidian with working checkboxes and no paste step.
+extra_outputs:
+  - <vault-root>/Open-Items-Rollup.md

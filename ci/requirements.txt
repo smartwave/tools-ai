@@ -1,0 +1,5 @@
+# Pinned dependencies for the governance checks in ci/.
+# Nothing else may be added — the checks must stay installable offline
+# from a single pip install -r ci/requirements.txt.
+PyYAML==6.0.2
+jsonschema==4.23.0
