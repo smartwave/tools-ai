@@ -1,0 +1,19 @@
+{
+  "name": "personal-assistant",
+  "displayName": "Personal Assistant",
+  "version": "2.0.0",
+  "description": "Personal productivity skills. Includes open-items — reminders of Claude work started and not finished, kept as one file per project in a single tracker folder (~/Documents/Claude/Claude Task Tracker, overridable with CLAUDE_TASK_TRACKER), with categories inside each file. Three commands (log-item, end-of-session, open-items-status), a format validator, and a status listing so choosing where an item goes is picking from a list rather than remembering. Nothing observes whether work is finished; the user decides, and closing deletes the line.",
+  "author": {
+    "name": "Matt Richardson (smartwave)"
+  },
+  "keywords": [
+    "open-items",
+    "reminders",
+    "personal",
+    "productivity",
+    "session",
+    "unfinished-work",
+    "end-of-session",
+    "task-tracker"
+  ]
+}

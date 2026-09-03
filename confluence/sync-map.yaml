@@ -1,0 +1,55 @@
+# Confluence projection map — repo section  ↔  Confluence page  ↔  owner
+#
+# PURPOSE
+#   Binds each repo artifact to the Confluence page it projects into, so an agent
+#   can regenerate a paste-ready insert (into inserts/) and a human can carry it
+#   to the right page. Confluence is a PROJECTION of this repo, not a second
+#   source of truth.
+#
+# WRITE POLICY
+#   Regenerating an insert file here is safe. Updating a live Confluence page is
+#   an outward action: draft only, then stop for human approval. Never change a
+#   page whose `owner` is not the person requesting the change without their
+#   sign-off.
+
+schema_version: 0.1.0
+owner: ai-org-management
+last_reviewed: 2026-07-15
+space:
+  key: "{{WIKI_SPACE_KEY}}"
+  cloud: "{{WIKI_HOST}}"
+
+# Auto-sync model: `source` is the FULL-PAGE authoritative Markdown; the
+# confluence-sync workflow publishes it to `page_id` on merge (sync gate =
+# CODEOWNERS-reviewed PR). `sync` mirrors the source front matter and must be
+# true for the workflow to publish. The `inserts/` files are the older
+# fragment-based drafts, superseded by full-page sources; kept for reference.
+pages:
+  - page_id: "{{PAGE_ID_AI_STANDARDS}}"
+    title: "{{ORG_NAME}} AI Solution Standards: Deploying AI Solutions"
+    space: "{{WIKI_SPACE_KEY}}"
+    owner: "{{AI_GOVERNANCE_OWNER}}"
+    live_version: "{{AI_STANDARD_VERSION}}"
+    source: pages/ai-solution-standards.md   # full-page authoritative source
+    sync: false                      # enable after seeding + fidelity check
+    superseded_insert: inserts/ai-solution-standards.md
+    pending_change: "{{AI_STANDARD_PENDING_VERSION}}"   # naming/tagging control — drafted, not ratified
+    projects_from:
+      - vocabulary/vocabulary.yaml
+      - schemas/manifest.schema.json
+      - projections/tag-map.yaml
+      - policy/tier-controls.yaml
+      - policy/standards.yaml
+
+  - page_id: "{{PAGE_ID_AGENTIC_SDLC}}"
+    title: "Standard & Configuration: The Agentic SDLC (Platform version)"
+    space: "{{WIKI_SPACE_KEY}}"   # where the page belongs once created
+    owner: "{{PLATFORM_SECURITY_LEAD_ROLE}}"   # substitute per PLACEHOLDERS.md; this owner's sign-off gates edits
+    live_version: "{{AGENTIC_SDLC_VERSION}}"   # header shows "Version: {{AGENTIC_SDLC_VERSION}} (draft)"
+    source: pages/agentic-sdlc-platform.md
+    sync: false                      # the page does not exist yet — see confluence/pages/README.md
+    superseded_insert: inserts/agentic-sdlc-platform.md
+    pending_change: "{{AGENTIC_SDLC_PENDING_VERSION}}"
+    projects_from:
+      - README.md                   # repository grammar / two-repo model
+      - schemas/manifest.schema.json

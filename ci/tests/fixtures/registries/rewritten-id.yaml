@@ -1,0 +1,5 @@
+# Fixture: the id from base.yaml was rewritten instead of retired in place.
+registry:
+  - asset_id: "ORG-AI-DATAOPS-PIPELINE-WATCHER"
+    name: dataops-pipeline-monitor
+    lifecycle: active

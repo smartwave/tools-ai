@@ -1,0 +1,8 @@
+# Fixture: the same asset_id minted twice.
+registry:
+  - asset_id: "ORG-AI-DATAOPS-PIPELINE-MONITOR"
+    name: dataops-pipeline-monitor
+    lifecycle: active
+  - asset_id: "ORG-AI-DATAOPS-PIPELINE-MONITOR"
+    name: dataops-pipeline-monitor-two
+    lifecycle: active

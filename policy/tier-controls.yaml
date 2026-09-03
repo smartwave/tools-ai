@@ -1,0 +1,219 @@
+# {{ORG_NAME}} — Tier → Required-Controls matrix (rules-as-data)
+#
+# PURPOSE
+#   The vocabulary defines the *values* a tier can take; this file defines what
+#   each tier *requires*. It is the machine-readable form of the normative
+#   controls an agent (or a human) applies when driving an in-scope AI solution
+#   through its lifecycle: which track is allowed, what oversight is mandatory,
+#   which records and gates must exist, who must approve, and when the manifest
+#   becomes a MUST. An agent reads this file to answer "given this asset, what
+#   is required of it?" without re-deriving the rule from prose.
+#
+# AUTHORITY
+#   Consistent with the rest of ai-org-management: this repo governs the
+#   machine-readable *rule*; the Confluence AI Solution Standards governs the
+#   *prose* and is the ratification surface. Where the two disagree on a value
+#   or rule, fix it here; where they disagree on reasoning or normative intent,
+#   Confluence governs. Every requirement below carries the control it derives
+#   from (`# [...]`) so the two cannot silently diverge.
+#
+# PROVENANCE CONVENTION
+#   [REF Bx]     sourced from a Required Control in the LIVE standard
+#                v{{AI_STANDARD_VERSION}} (Confluence {{PAGE_ID_AI_STANDARDS}}).
+#                Enforceable now.
+#   [REC]        sourced from a Recommended Pattern in the live standard
+#                (SHOULD / MAY). Guidance, not a gate — do not hard-enforce.
+#   [REF insert] sourced from the PENDING naming/tagging insert
+#                (v{{AI_STANDARD_PENDING_VERSION}} draft,
+#                not yet ratified). Governs asset_id, manifest, registry, Gate-1
+#                minting. Do not enforce until the insert is ratified.
+#   [PROPOSED]   inferred; not found in any source. Confirm before enforcement.
+#
+# STATUS: draft for review. Reconciled against the live standard 2026-07-15.
+#   Manifest/asset_id/registry rows depend on the not-yet-ratified
+#   {{AI_STANDARD_PENDING_VERSION}} insert.
+
+schema_version: 0.2.0              # SemVer of this policy file itself
+owner: ai-org-management
+last_reviewed: 2026-07-15
+references:
+  vocabulary: ../vocabulary/vocabulary.yaml
+  standard_prose: ../confluence/inserts/ai-solution-standards.md
+  confluence_page: "{{PAGE_ID_AI_STANDARDS}}"
+  standard_version: "{{AI_STANDARD_VERSION}}"   # live standard version this file was reconciled against
+
+# ---------------------------------------------------------------------------
+# How to read this file
+# ---------------------------------------------------------------------------
+# 1. Determine the asset's tier per B1.3 (worse of potential harm and degree of
+#    independence). `shape` and `data_class` can RAISE the effective tier — see
+#    `modifiers` — so resolve modifiers first, then look up the tier row.
+# 2. The matched `tiers` entry lists what is required. `allowed_*` fields are
+#    closed sets: a value outside them is a violation, not a default.
+# 3. `oversight_rules` are condition-gated (B1.4) and are the authoritative test;
+#    each tier's `allowed_oversight` is the envelope those rules imply.
+# 4. `modifiers` and `invariants` may only tighten a requirement, never relax it.
+
+# ---------------------------------------------------------------------------
+# Tier definitions (mirrors vocabulary.yaml `tier`; do not restate values elsewhere)
+# ---------------------------------------------------------------------------
+tiers:
+  1:
+    label: Low
+    definition: >
+      Reversible, internal-only, no writes to an authoritative system, no
+      regulated data.                                              # [REF B1.3]
+    manifest: recommended            # SHOULD                       # [REF insert]
+    allowed_tracks: [b, local]       # Track B = internal low-risk Tier 1        # [REC "Use the paved roads"]
+    allowed_oversight: [hitl, hotl, autonomous]   # see oversight_rules; autonomous barred in local lane (B1.4) # [REF B1.4]
+    required_records: []             # Requirements + Epic are RECOMMENDED at Tier 1 # [REF B1.9] (Epic recommended)
+    recommended_records: [requirements, epic]                     # [REF B1.9 / records model]
+    required_gates: [pre-flight]     # B1.7 has no tier qualifier for deployed solutions # [REF B1.7]
+    local_lane_note: >
+      A non-engineer's local tool follows the B1.5 non-negotiables instead of a
+      full deployment pre-flight: person-in-loop, single folder, enrolled device,
+      Keychain secrets, no regulated data, inventoried.            # [REF B1.5]
+    approvals:
+      - role: solution-owner         # Accountable owner            # [REF Roles]
+        for: self-attestation
+      - role: change-acceptor        # someone other than the builder # [REF B1.6]
+        for: change-acceptance
+        when: material-change
+  2:
+    label: Moderate
+    definition: >
+      Writes to an authoritative system, faces outside the company, or moves
+      money.                                                       # [REF B1.3]
+    manifest: required               # MUST                         # [REF insert]
+    allowed_tracks: [a]              # Track A = production/regulated/Tier 2-3   # [REC "Use the paved roads"]
+    allowed_oversight: [hitl, hotl]  # NOT autonomous — Tier 2 writes/faces-out/moves-money is never read-only # [REF B1.4]
+    required_records: [requirements, spec, epic]   # Epic at Gate 1 before build; Spec before pre-flight # [REF B1.9 / B1.7]
+    required_gates: [gate-1, pre-flight]                          # [REF B1.9 / B1.7]
+    tier2plus_technical_controls:    # MUST for Tier 2+             # [REF Technical Controls]
+      - behavioral-contract-before-build
+      - idempotent-or-double-execution-guarded-writes
+      - explicit-integration-contract-per-system
+      - model-and-version-pinned-prompts-version-controlled
+      - sandbox-staging-production-separated
+      - guardrails-enforced-outside-agent-code   # Bedrock AgentCore Guardrails at the Gateway
+      - input-output-checks-with-spend-and-rate-caps
+      - observability-of-quality-and-drift
+    approvals:
+      - role: solution-owner
+        for: accountable-sign-off                                 # [REF Roles]
+      - role: change-acceptor        # PR review satisfies this for code (B1.6) # [REF B1.6]
+        for: change-acceptance
+      - role: engineering            # Engineering owns Track A (Tier 2-3)      # [REF Roles]
+        for: track-a-build
+        when: track == a
+  3:
+    label: High
+    definition: >
+      Regulated data, safety impact, irreversible, or customer-facing
+      decisions.                                                   # [REF B1.3]
+    manifest: required               # MUST                         # [REF insert]
+    allowed_tracks: [a]              # engineering-built IaC only                # [REC "Use the paved roads"]
+    allowed_oversight: [hitl]        # HOTL needs reversible/internal; Tier 3 is irreversible/high-harm # [REF B1.4]
+    required_records: [requirements, spec, epic]                  # [REF B1.9 / B1.7]
+    required_gates: [gate-1, pre-flight]                          # [REF B1.9 / B1.7]
+    tier3_additional_preflight:      # MUST, on top of the B1.7 base # [REF B1.7]
+      - adversarial-stress-testing
+      - documented-approver-sign-off
+      - registered-through-standard-ai-capability-request
+    approvals:
+      - role: solution-owner
+        for: accountable-sign-off                                 # [REF Roles]
+      - role: change-acceptor
+        for: documented-sign-off     # Tier 3 requires documented approver sign-off # [REF B1.7 / Roles]
+      - role: engineering            # Track A is mandatory at Tier 3           # [REF Roles]
+        for: track-a-build
+      # NOTE: the live standard does NOT require blanket Security sign-off for
+      # every Tier 3. Security is required by trigger, not by tier — see
+      # security_triggers below.
+
+# ---------------------------------------------------------------------------
+# Oversight rules (B1.4) — condition-gated and authoritative. The per-tier
+# allowed_oversight above is the envelope these rules imply.
+# ---------------------------------------------------------------------------
+oversight_rules:
+  hitl:
+    required_when: [irreversible, leaves-the-company, involves-money]  # [REF B1.4]
+  hotl:
+    permitted_only_when: [reversible, internal, recorded, independently-checkable] # [REF B1.4]
+  autonomous:
+    permitted_only_when: [read-only-monitoring, no-judgment-calls, no-external-reliance] # [REF B1.4]
+    never_when: [non-engineer-runs-locally]                        # [REF B1.4]
+
+# ---------------------------------------------------------------------------
+# Modifiers — applied on top of the tier row; may only tighten, never relax.
+# ---------------------------------------------------------------------------
+modifiers:
+
+  # Behavioral axis (shape). Agentic behavior is metadata, not a repo type, but
+  # it changes what is required (B1.2).
+  shape:
+    agent:
+      effect: raises-tier
+      forces_min_tier: 2                                          # [REF B1.2] choosing an agent MUST be >= Tier 2
+      escalation: >
+        If the agent makes the key decision, treat as Tier 3 UNLESS a person or
+        a fixed rule-based check verifies the result.             # [REF B1.2]
+    multi-agent:
+      effect: gate
+      requires_involvement: [engineering, security]               # [REF B1.2] MUST NOT be built without both
+      note: "Multiple coordinated agents for non-product work."   # [REF B1.2 / Terms]
+
+  # Data sensitivity (B1.3 / Roles). Regulated data is a Tier 3 trigger AND
+  # pulls in Data/Privacy.
+  data_class:
+    regulated:
+      forces_min_tier: 3             # Tier 3 is defined by "regulated data"     # [REF B1.3]
+      requires_involvement: [data-privacy]                        # [REF Roles]
+      note: >
+        Regulated or personal data is a Tier 3 condition; Data/Privacy is looped
+        in on any use of it.                                       # [REF B1.3 / Roles]
+
+  # Lane. The local lane is a Tier 1-only required control.
+  track:
+    local:
+      max_tier: 1                                                 # [REF B1.5]
+
+# ---------------------------------------------------------------------------
+# Security involvement is trigger-based, not tier-based (Roles). An agent
+# should route to Security when any trigger is present, regardless of tier.
+# ---------------------------------------------------------------------------
+security_triggers:                                                # [REF Roles / B1.7]
+  - exception-to-a-MUST                # Security approves exceptions
+  - mcp-server-or-connector-in-use     # Security reviews connectors + scope
+  - connector-reaching-another-system  # requires signed vendor agreement + Security sign-off
+  - multi-agent-solution               # Engineering + Security before build (B1.2)
+  - stop-and-report-condition          # red-flag escalations go to Security/IT
+
+# ---------------------------------------------------------------------------
+# Invariants an agent should refuse to violate (hard stops, not advice)
+# ---------------------------------------------------------------------------
+invariants:
+  - id: no-app-on-app
+    rule: "workload_type app MUST NOT depend on another app."     # [REF insert / vocabulary]
+  - id: local-tier-1-only
+    rule: "track 'local' is permitted only at tier 1."            # [REF B1.5]
+  - id: standard-process-is-not-an-agent
+    rule: "a rules-based, pre-mappable step MUST be a fixed workflow, never a self-directing agent." # [REF B1.2]
+  - id: agent-raises-tier
+    rule: "choosing an agent raises the solution to at least Tier 2." # [REF B1.2]
+  - id: multi-agent-gate
+    rule: "multi-agent solutions MUST NOT be built for non-product work without Engineering and Security." # [REF B1.2]
+  - id: tier-2-plus-manifest
+    rule: "tier >= 2 MUST carry a governance manifest."           # [REF insert]
+  - id: change-accepted-by-non-builder
+    rule: "every material change MUST be accepted by someone other than the builder." # [REF B1.6]
+  - id: guardrails-outside-agent
+    rule: "at Tier 2+, guardrail and policy checks MUST be enforced outside the agent's own code." # [REF Technical Controls]
+  - id: secrets-in-approved-store
+    rule: "secrets MUST live in an approved store or system keychain, never in code, prompts, Drive, or a repo." # [REF Technical Controls]
+  - id: id-at-gate-1
+    rule: "an asset_id MUST be minted in the registry at Gate 1 before build." # [REF insert]
+  - id: spec-before-preflight
+    rule: "a Solution Spec MUST exist before the pre-flight gate."  # [REF B1.7]
+  - id: off-switch-and-rollback
+    rule: "every solution MUST have a tested off switch and documented rollback, all tiers." # [REF Technical Controls]

@@ -1,0 +1,19 @@
+# CODEOWNERS — required reviewers for governed sources.
+#
+# Each Confluence page source requires its page owner's approval before merge.
+# Because the confluence-sync workflow publishes on merge, this review IS the
+# change-control gate (B1.6) and the page-owner sign-off the standard requires.
+#
+# Replace the handles below with real GitHub usernames / teams.
+
+# AI Solution Standards ({{WIKI_SPACE_KEY}} space) — owned by {{AI_GOVERNANCE_OWNER}}
+/confluence/pages/ai-solution-standards.md    @{{AI_GOVERNANCE_OWNER_HANDLE}}
+
+# Agentic SDLC (Platform) — owned by the {{PLATFORM_SECURITY_LEAD_ROLE}}.
+# This reviewer IS that page's sign-off gate, so substitute the token below
+# (PLACEHOLDERS.md) before setting sync: true for the page.
+/confluence/pages/agentic-sdlc-platform.md    @{{GITHUB_ORG}}/{{PLATFORM_SECURITY_TEAM}}
+
+# The policy rules-as-data and the vocabulary are governance-critical too.
+/policy/                                      @{{AI_GOVERNANCE_OWNER_HANDLE}}
+/vocabulary/                                  @{{AI_GOVERNANCE_OWNER_HANDLE}}

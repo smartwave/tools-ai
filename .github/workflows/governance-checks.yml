@@ -1,0 +1,50 @@
+name: governance-checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the registry append-only check needs the base ref
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pinned dependencies
+        run: pip install -r ci/requirements.txt
+
+      - name: Materialize adopter configuration
+        env:
+          ORG_NAME: ${{ vars.ORG_NAME }}
+          ASSET_ID_PREFIX: ${{ vars.ASSET_ID_PREFIX }}
+          TAG_NAMESPACE: ${{ vars.TAG_NAMESPACE }}
+          DOC_ID_PREFIX: ${{ vars.DOC_ID_PREFIX }}
+          ENFORCE_PENDING_INSERT: ${{ vars.ENFORCE_PENDING_INSERT }}
+        run: |
+          if [ -z "$ASSET_ID_PREFIX" ] || [ -z "$TAG_NAMESPACE" ]; then
+            echo "::notice::not configured — set the ASSET_ID_PREFIX and TAG_NAMESPACE repository variables to enable the governance checks. A generic clone stays green."
+            exit 0
+          fi
+          cat > config/governance.yaml <<EOF
+          org_name: "${ORG_NAME}"
+          asset_id_prefix: "${ASSET_ID_PREFIX}"
+          tag_namespace: "${TAG_NAMESPACE}"
+          doc_id_prefix: "${DOC_ID_PREFIX}"
+          enforce_pending_insert: ${ENFORCE_PENDING_INSERT:-false}
+          EOF
+
+      - name: Run the governance checks
+        run: ci/run-all
+
+      - name: Run the fixture suite
+        run: ci/tests/run

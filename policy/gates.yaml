@@ -1,0 +1,62 @@
+# {{ORG_NAME}} — Lifecycle gates (rules-as-data)
+#
+# PURPOSE
+#   The named checkpoints an in-scope solution passes through, with entry/exit
+#   criteria and the records each gate produces or requires. tier-controls.yaml
+#   references these gate ids in its `required_gates` field.
+#
+# PROVENANCE: [REF] live AI Solution Standards v{{AI_STANDARD_VERSION}}
+#   (Confluence {{PAGE_ID_AI_STANDARDS}}), except the asset_id-minting exit
+#   criterion which is [REF insert] (pending {{AI_STANDARD_PENDING_VERSION}}
+#   naming/tagging control — do not enforce until ratified).
+#
+# STATUS: seed.
+
+schema_version: 0.1.0
+owner: ai-org-management
+last_reviewed: 2026-07-15
+standard:
+  page: "{{PAGE_ID_AI_STANDARDS}}"
+  version: "{{AI_STANDARD_VERSION}}"
+
+gates:
+  - id: gate-1
+    title: Requirements approved
+    when: "AI Solution Requirements is approved, before build begins."   # [REF B1.9]
+    produces:
+      - approved-requirements                                            # [REF B1.9]
+      - jira-epic-opened            # Tier 2+ MUST; Tier 1 recommended    # [REF B1.9]
+      - asset-id-minted             # in registry/registry.yaml           # [REF insert]
+    exit_criteria:
+      - "Requirements approved and linked."                              # [REF B1.9]
+      - "Epic opened and links the Requirements (Tier 2+)."              # [REF B1.9]
+
+  - id: pre-flight
+    title: Pre-flight gate (go-live)
+    when: "Before the solution goes live."                               # [REF B1.7]
+    requires:                        # all MUST be true (B1.7)
+      - goal-defined-to-root-cause
+      - data-labeled-and-least-privilege-access
+      - model-and-version-fixed-prompts-tracked
+      - approved-tools-only
+      - correct-result-defined-and-tested-including-edge-cases
+      - guardrails-check-input-and-output-with-spend-and-rate-caps
+      - monitoring-of-quality-and-drift
+      - decisions-logged-reconstructably
+      - one-person-named-accountable
+      - threat-modeled-against-owasp-top-10-agentic-2026
+      - documented-rollback-and-retirement-path
+      - solution-spec-exists                                             # [REF B1.7]
+    tier_3_additional:               # [REF B1.7]
+      - adversarial-stress-testing
+      - documented-approver-sign-off
+      - registered-through-standard-ai-capability-request
+    exit_criteria:
+      - "All B1.7 items true; Tier 3 extras satisfied where applicable."
+
+# Retirement is not a numbered gate but a required lifecycle end-state (B1.8).
+retirement:                                                             # [REF B1.8]
+  triggers:
+    - ownerless-automation           # MUST be retired or reassigned
+    - formal-abandonment             # record why; Epic may close
+  record: "lifecycle: retired in the manifest and registry (never reuse the asset_id)."

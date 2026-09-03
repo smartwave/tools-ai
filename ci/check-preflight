@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""check-preflight — the B1.7 pre-flight gate, evidenced.
+
+Usage: ci/check-preflight <manifest> [...]
+
+The item list is read from policy/gates.yaml (`pre-flight`), never hardcoded:
+editing the policy changes this check without a code change.
+
+Asserts:
+  - every base item is `met` or `exception`, with evidence — an item marked
+    `met` with empty evidence fails, because the checklist is an evidence
+    record, not a box-ticking exercise;
+  - every `exception` has a matching, unexpired entry in exceptions.yaml with
+    all fields filled (B1.8);
+  - at effective Tier 3, the tier_3_additional items too;
+  - records.spec is present (spec-before-preflight, B1.7).
+
+The 'correct result defined and tested' item is auto-satisfied when
+ci/check-evaluation passes for the asset; otherwise it must carry manual
+evidence like any other item.
+
+Evidence lives in assets/<asset_id>/preflight.yaml and
+assets/<asset_id>/exceptions.yaml — see assets/README.md.
+"""
+
+import datetime
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import evaluation, governance as gov
+from lib.cli import run
+from lib.config import load_config
+from lib.loader import load_yaml, where
+from lib.report import EXIT_OK, Report
+
+EVALUATION_ITEM = "correct-result-defined-and-tested-including-edge-cases"
+EXCEPTION_REQUIRED = ["rule", "reason", "compensating_control", "accepted_by", "expires"]
+
+
+def today():
+    return datetime.date.today().isoformat()
+
+
+def load_exceptions(directory, report):
+    path = os.path.join(directory, "exceptions.yaml")
+    if not os.path.exists(path):
+        return {}, path
+    data = load_yaml(path)
+    entries = data.get("exceptions") if isinstance(data, dict) else data
+    result = {}
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        result[entry.get("rule")] = entry
+    return result, path
+
+
+def check(path, config, policy, gate):
+    manifest = gov.load_manifest(path, config)
+    report = Report("check-preflight", path, config)
+    tier, _, _ = gov.effective_tier(manifest, policy)
+    directory = gov.asset_dir(manifest)
+    preflight_path = os.path.join(directory, "preflight.yaml")
+
+    if not (manifest.get("records") or {}).get("spec"):
+        report.fail("B1.7", "%s: records.spec is missing — a Solution Spec MUST "
+                            "exist before the pre-flight gate" % path)
+
+    items = list(gate.get("requires") or [])
+    if tier >= 3:
+        items += list(gate.get("tier_3_additional") or [])
+        report.notice("effective tier 3: tier_3_additional items required")
+
+    if not os.path.exists(preflight_path):
+        report.fail("B1.7", "%s: no pre-flight record at %s — %d item(s) unevidenced"
+                    % (path, preflight_path, len(items)))
+        return report
+
+    data = load_yaml(preflight_path)
+    entries = data.get("items") if isinstance(data, dict) else data
+    recorded = {}
+    for entry in entries or []:
+        if isinstance(entry, dict) and entry.get("item"):
+            recorded[entry["item"]] = entry
+
+    exceptions, exceptions_path = load_exceptions(directory, report)
+    eval_ok = evaluation.passes(manifest, path, config, policy)
+
+    for item in items:
+        entry = recorded.get(item)
+        if entry is None:
+            if item == EVALUATION_ITEM and eval_ok:
+                report.ok("B1.7", "%s: auto-satisfied by ci/check-evaluation" % item)
+                continue
+            report.fail("B1.7", "%s: pre-flight item '%s' is not recorded"
+                        % (preflight_path, item))
+            continue
+
+        status = entry.get("status")
+        location = where(preflight_path, item)
+        if status == "met":
+            if not entry.get("evidence"):
+                if item == EVALUATION_ITEM and eval_ok:
+                    report.ok("B1.7", "%s: auto-satisfied by ci/check-evaluation" % item)
+                else:
+                    report.fail("B1.7",
+                                "%s: item '%s' is marked met with no evidence — the "
+                                "checklist is an evidence record" % (location, item))
+            for field in ("checked_by", "date"):
+                if not entry.get(field):
+                    report.fail("B1.7", "%s: item '%s' has no %s"
+                                % (location, item, field))
+        elif status == "exception":
+            exception = exceptions.get(item)
+            if not exception:
+                report.fail("B1.8",
+                            "%s: item '%s' claims an exception with no matching entry "
+                            "in %s" % (location, item, exceptions_path))
+                continue
+            for field in EXCEPTION_REQUIRED:
+                if not exception.get(field):
+                    report.fail("B1.8", "%s: exception for '%s' has no %s"
+                                % (exceptions_path, item, field))
+            expires = str(exception.get("expires") or "")
+            if expires and expires < today():
+                report.fail("B1.8", "%s: exception for '%s' expired on %s"
+                            % (exceptions_path, item, expires))
+        elif status == "pending":
+            report.fail("B1.7", "%s: item '%s' is still pending" % (location, item))
+        else:
+            report.fail("B1.7", "%s: item '%s' has status '%s' — expected met, "
+                                "exception, or pending" % (location, item, status))
+
+    for criterion in gate.get("exit_criteria") or []:
+        report.notice("pre-flight exit criterion: %s" % criterion)
+
+    if not report.failures:
+        report.ok("B1.7", "all %d pre-flight item(s) evidenced" % len(items))
+    return report
+
+
+def main():
+    paths = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not paths:
+        sys.stderr.write("usage: ci/check-preflight <manifest> [...]\n")
+        return 1
+    config = load_config()
+    policy = gov.tier_controls()
+    gate = gov.gates().get("pre-flight") or {}
+
+    code = EXIT_OK
+    for path in paths:
+        report = check(path, config, policy, gate)
+        report.render()
+        code = code or report.exit_code
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(run(main))

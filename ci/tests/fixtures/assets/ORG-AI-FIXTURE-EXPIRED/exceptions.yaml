@@ -1,0 +1,7 @@
+# Fixture B1.8 exception log.
+exceptions:
+  - rule: threat-modeled-against-owasp-top-10-agentic-2026
+    reason: Threat model scheduled with Security for the next sprint.
+    compensating_control: Tool allowlist plus rate caps at the gateway.
+    accepted_by: Security Lead
+    expires: "2026-01-31"

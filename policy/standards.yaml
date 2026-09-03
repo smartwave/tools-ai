@@ -1,0 +1,83 @@
+# {{ORG_NAME}} — Control catalog (rules-as-data index of the AI Solution Standards)
+#
+# PURPOSE
+#   A machine-readable index of the Required Controls in the live standard, so an
+#   agent can resolve a control id (e.g. B1.4) to its title, requirement level,
+#   tier applicability, and Confluence anchor without parsing prose. This file is
+#   an INDEX, not a restatement — the normative text lives in Confluence.
+#
+# PROVENANCE: all entries [REF] the live AI Solution Standards
+#   v{{AI_STANDARD_VERSION}} (Confluence {{PAGE_ID_AI_STANDARDS}}). Titles
+#   paraphrase the standard's headings.
+#
+# STATUS: seed. Covers the Required Controls (Standards) section; Recommended
+#   Patterns and Design Principles (D1–D6) are indexed as non-normative.
+
+schema_version: 0.1.0
+owner: ai-org-management
+last_reviewed: 2026-07-15
+standard:
+  page: "{{PAGE_ID_AI_STANDARDS}}"
+  version: "{{AI_STANDARD_VERSION}}"
+
+# level: MUST | SHOULD  (MUST = Required Control; SHOULD = Recommended Pattern / Design Principle)
+controls:
+  - id: B1.2
+    title: Solution Shape
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "Rules-based steps are workflows; agents raise the tier; multi-agent needs Engineering + Security."
+  - id: B1.3
+    title: Tier
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "Tier before design, by the worse of potential harm and degree of independence."
+  - id: B1.4
+    title: Oversight
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "HITL / HOTL / autonomous, gated by reversibility, audience, and money (see tier-controls oversight_rules)."
+  - id: B1.5
+    title: Local-lane non-negotiables
+    level: MUST
+    tiers: [1]
+    summary: "Tier 1 only; person-in-loop, single folder, enrolled device, keychain secrets, inventoried."
+  - id: B1.6
+    title: Change control
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "Classified, accepted by a non-builder; rollback + PIR for Major Normal / Emergency."
+  - id: B1.7
+    title: Pre-flight gate
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "Go-live checklist; Tier 3 adds adversarial testing + documented approver sign-off."
+  - id: B1.8
+    title: Exceptions and retirement
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "Exceptions logged with reason/safeguard/acceptor/expiry; ownerless automations retired."
+  - id: B1.9
+    title: Work-effort tracking
+    level: MUST
+    tiers: [2, 3]
+    summary: "Tier 2+ Jira Epic opened at Gate 1 before build; Tier 1 recommended."
+  - id: technical-controls
+    title: Technical Controls (secrets, tools/data/access, behavior, model/env, versioning, data-quality, guardrails, observability)
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "Tier-scaled; several items marked Tier 2+. See tier-controls tier2plus_technical_controls."
+  - id: stop-and-report
+    title: Mandatory Stop-and-Report
+    level: MUST
+    tiers: [1, 2, 3]
+    summary: "Stop and contact Security/IT on unrequested action, exposed secret, or over-privileged tool."
+
+# Non-normative guidance (indexed for reference; never enforced as gates).
+design_principles:                                               # [REF] Design Principles D1–D6, all SHOULD
+  - { id: D1, title: "Shape of the loop", level: SHOULD }
+  - { id: D2, title: "Memory", level: SHOULD }
+  - { id: D3, title: "MCP servers and tool connections", level: SHOULD }
+  - { id: D4, title: "Orchestration", level: SHOULD }
+  - { id: D5, title: "Evaluation and guardrails", level: SHOULD }
+  - { id: D6, title: "Failure modes", level: SHOULD }

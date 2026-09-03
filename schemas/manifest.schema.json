@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://{{ORG_DOMAIN}}/ai-org-management/naming-and-tagging/manifest.schema.json",
+  "title": "{{ORG_NAME}} AI Governance Manifest",
+  "description": "Authoritative per-asset metadata. One home per question: this manifest is the source; AWS resource tags and GitHub topics are projections of it. Field requirements below describe the Tier 2+ shape (MUST). For Tier 1, a manifest is recommended (SHOULD) and only asset_id, name, version, workload_type, and owner are expected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "name",
+    "version",
+    "scope",
+    "workload_type",
+    "tier",
+    "track",
+    "shape",
+    "oversight",
+    "data_class",
+    "owner",
+    "lifecycle",
+    "records"
+  ],
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "pattern": "^{{ASSET_ID_PREFIX}}[A-Z0-9]+(-[A-Z0-9]+)+$",
+      "description": "Stable, immutable. {{ASSET_ID_PREFIX}}<DOMAIN>-<SLUG>.",
+      "$comment": "SUBSTITUTION REQUIRED: replace {{ASSET_ID_PREFIX}} in the pattern above with the adopter's literal prefix (default ORG-AI-) before this schema will validate any asset_id. JSON carries no comments, so this note lives here."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Lowercase repo/asset slug. No invented abbreviations."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+      "description": "SemVer 2.0.0."
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["non-product"],
+      "description": "This standard governs non-product AI. Product is governed separately."
+    },
+    "workload_type": {
+      "type": "string",
+      "enum": ["tool", "platform", "service", "app"],
+      "description": "Structural axis. Classify by dependency position, not implementation."
+    },
+    "workload_subtype": {
+      "type": "string",
+      "description": "Optional. Under 'app', the product identifier (<productName>)."
+    },
+    "shape": {
+      "type": "string",
+      "enum": ["workflow", "agent", "multi-agent"],
+      "description": "Behavioral axis (B1.2). Orthogonal to workload_type."
+    },
+    "tier": {
+      "type": "integer",
+      "enum": [1, 2, 3],
+      "description": "B1.3 — worse of potential harm and degree of independence."
+    },
+    "track": {
+      "type": "string",
+      "enum": ["a", "b", "local"],
+      "description": "Lane / paved road."
+    },
+    "oversight": {
+      "type": "string",
+      "enum": ["hitl", "hotl", "autonomous"],
+      "description": "B1.4."
+    },
+    "data_class": {
+      "type": "string",
+      "enum": ["public", "confidential", "regulated"],
+      "description": "Maximum sensitivity touched."
+    },
+    "owner": {
+      "type": "string",
+      "description": "Solution Owner (Accountable). A person, not a team."
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["draft", "active", "deprecated", "retired"],
+      "description": "B1.8."
+    },
+    "business_unit": {
+      "type": "string",
+      "description": "Owning domain — the business unit or functional area (the <domain> slot). No abbreviations."
+    },
+    "vendor": {
+      "type": "string",
+      "description": "Platform the asset targets or runs on (the <vendor> slot): aws, snowflake, aiven, claude, github, workato, etc."
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["sandbox", "staging", "production"],
+      "description": "Deployment-time value. Belongs in the manifest and AWS tags, never in a public GitHub topic."
+    },
+    "records": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirements", "epic"],
+      "description": "Governed records. Requirements approved at Gate 1; Epic opened at Gate 1 before build (B1.9); Spec added during build and required before the pre-flight gate (B1.7).",
+      "properties": {
+        "requirements": { "type": "string", "description": "Link to approved AI Solution Requirements." },
+        "spec": { "type": "string", "description": "Link to Solution Spec. Required before pre-flight (B1.7)." },
+        "epic": { "type": "string", "description": "Work-tracker Epic key (Jira in the reference configuration) (B1.9)." }
+      }
+    },
+    "mcp_servers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "MCP servers/connectors the asset reaches. Feeds the AIBOM (SDLC Build stage) and connector review."
+    }
+  }
+}

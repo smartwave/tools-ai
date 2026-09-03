@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""check-projections — manifest -> GitHub topics / AWS tags.
+
+Usage: ci/check-projections <manifest> [--topics-file F] [--tags-file F]
+
+Derives the expected projection from projections/tag-map.yaml (including the
+<namespace>-ai-governed marker topic) and diffs it against the actuals supplied
+in the given files: one topic per line, one key=value per line for tags. With
+no actuals the expected projection is printed and the check exits 0 —
+generator mode, useful locally.
+
+The leak check always runs: no excluded field (environment, owner,
+business_unit, or anything customer-identifying, secret, or financial) may
+appear in a public GitHub topic.
+
+Offline by design: this check never queries GitHub or AWS.
+"""
+
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import governance as gov
+from lib.cli import run
+from lib.config import load_config
+from lib.report import Report
+
+# Fields the tag-map keeps out of public topics on purpose.
+EXCLUDED_FROM_TOPICS = ("environment", "owner", "business_unit")
+
+
+def slug(value):
+    """A value as it would look once squeezed into a GitHub topic."""
+    return re.sub(r"[^a-z0-9]+", "-", str(value).lower()).strip("-")
+
+
+def expected_projection(manifest, tagmap, config):
+    projections = tagmap.get("projections") or {}
+    topics = []
+    tags = {}
+    for field, rule in projections.items():
+        value = manifest.get(field)
+        if value is None:
+            continue
+        aws_tag = rule.get("aws_tag")
+        if aws_tag:
+            tags[aws_tag] = str(value)
+        template = rule.get("github_topic")
+        if template:
+            topics.append(template.replace("<value>", str(value)))
+    marker = ((tagmap.get("inventory_marker") or {}).get("github_topic"))
+    if marker:
+        topics.insert(0, marker)
+    return sorted(set(topics)), tags
+
+
+def read_lines(path):
+    with open(path) as handle:
+        return [line.strip() for line in handle if line.strip()
+                and not line.strip().startswith("#")]
+
+
+def main():
+    args = sys.argv[1:]
+    manifest_path = None
+    topics_file = None
+    tags_file = None
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--topics-file":
+            index += 1
+            topics_file = args[index] if index < len(args) else None
+        elif arg == "--tags-file":
+            index += 1
+            tags_file = args[index] if index < len(args) else None
+        elif not arg.startswith("-") and manifest_path is None:
+            manifest_path = arg
+        index += 1
+
+    if not manifest_path:
+        sys.stderr.write("usage: ci/check-projections <manifest> "
+                         "[--topics-file F] [--tags-file F]\n")
+        return 1
+
+    config = load_config()
+    manifest = gov.load_manifest(manifest_path, config)
+    tagmap = gov.tag_map(config)
+    report = Report("check-projections", manifest_path, config)
+
+    topics, tags = expected_projection(manifest, tagmap, config)
+
+    if topics_file is None and tags_file is None:
+        sys.stdout.write("expected GitHub topics:\n")
+        for topic in topics:
+            sys.stdout.write("  %s\n" % topic)
+        sys.stdout.write("expected AWS tags:\n")
+        for key in sorted(tags):
+            sys.stdout.write("  %s=%s\n" % (key, tags[key]))
+        report.notice("generator mode: no actuals supplied, nothing diffed")
+        report.render()
+        return report.exit_code
+
+    actual_topics = read_lines(topics_file) if topics_file else None
+    actual_tags = {}
+    if tags_file:
+        for line in read_lines(tags_file):
+            key, _, value = line.partition("=")
+            actual_tags[key.strip()] = value.strip()
+
+    if actual_topics is not None:
+        for topic in topics:
+            if topic not in actual_topics:
+                report.fail("projections", "%s: missing GitHub topic '%s'"
+                            % (topics_file, topic))
+        for topic in actual_topics:
+            if topic.startswith(config.tag_namespace + "-") and topic not in topics:
+                report.fail("projections",
+                            "%s: topic '%s' is in the namespace but is not "
+                            "projected by the manifest" % (topics_file, topic))
+
+    if tags_file:
+        for key, value in tags.items():
+            if key not in actual_tags:
+                report.fail("projections", "%s: missing AWS tag '%s'" % (tags_file, key))
+            elif actual_tags[key] != value:
+                report.fail("projections",
+                            "%s: AWS tag '%s' is '%s', manifest projects '%s'"
+                            % (tags_file, key, actual_tags[key], value))
+
+    # Leak check — always, whatever else was supplied.
+    if actual_topics is not None:
+        for field in EXCLUDED_FROM_TOPICS:
+            value = manifest.get(field)
+            if value is None:
+                continue
+            needle = slug(value)
+            for topic in actual_topics:
+                if needle and needle in topic.lower():
+                    report.fail("projections",
+                                "%s: excluded field '%s' (value '%s') leaks into "
+                                "public GitHub topic '%s' — GitHub topics are "
+                                "public even on private repos"
+                                % (topics_file, field, value, topic))
+        report.unknowable("projections",
+                          "customer-identifying, secret, or financial values in "
+                          "topics can only be spotted by a human reviewer")
+
+    if not report.failures:
+        report.ok("projections", "topics and tags match the manifest")
+    report.render()
+    return report.exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(run(main))

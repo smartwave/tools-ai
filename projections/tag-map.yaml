@@ -1,0 +1,71 @@
+# Tag / topic projection map (machine-readable)
+#
+# The manifest is the single source of truth. These rules define how manifest
+# fields project onto the two downstream surfaces. A CI check in this repo can
+# read the manifest and assert that a repo's topics and a resource's tags match.
+#
+# Two GitHub-topic prefixes by facet:
+#   {{TAG_NAMESPACE}}-       domain-general facets (workload type, domain)
+#   {{TAG_NAMESPACE}}-ai-    AI-governance facets (governed marker, tier, shape, track, data)
+#
+# AWS tag keys use the {{TAG_NAMESPACE}}: prefix (AWS-recommended org-prefix + colon).
+#
+# SUBSTITUTION REQUIRED: replace {{TAG_NAMESPACE}} throughout this file with the
+# adopter's literal namespace (default `org`) before any projection is generated
+# or compared against real tags/topics by CI.
+# Constraints (AWS, official): <=50 user-created tags/resource, key <=128 chars,
+# value <=256 chars, 'aws:' prefix reserved.
+# Constraints (GitHub, official): lowercase/numbers/hyphens, <=50 chars, <=20 topics/repo.
+
+projections:
+
+  # field: how it appears as an AWS resource tag / a GitHub topic
+  asset_id:
+    aws_tag: "{{TAG_NAMESPACE}}:asset-id"
+    github_topic: null            # too high-cardinality for a topic
+  workload_type:
+    aws_tag: "{{TAG_NAMESPACE}}:workload-type"
+    github_topic: "{{TAG_NAMESPACE}}-workload-<value>"     # e.g. {{TAG_NAMESPACE}}-workload-platform
+  workload_subtype:
+    aws_tag: "{{TAG_NAMESPACE}}:workload-subtype"
+    github_topic: null
+  shape:
+    aws_tag: "{{TAG_NAMESPACE}}:shape"
+    github_topic: "{{TAG_NAMESPACE}}-ai-shape-<value>"
+  tier:
+    aws_tag: "{{TAG_NAMESPACE}}:tier"
+    github_topic: "{{TAG_NAMESPACE}}-ai-tier-<value>"
+  track:
+    aws_tag: "{{TAG_NAMESPACE}}:track"
+    github_topic: "{{TAG_NAMESPACE}}-ai-track-<value>"
+  data_class:
+    aws_tag: "{{TAG_NAMESPACE}}:data-class"
+    github_topic: "{{TAG_NAMESPACE}}-ai-data-<value>"
+  oversight:
+    aws_tag: "{{TAG_NAMESPACE}}:oversight"
+    github_topic: null            # varies per deployment; not a repo-level fact
+  business_unit:
+    aws_tag: "{{TAG_NAMESPACE}}:business-unit"
+    github_topic: null            # tag/manifest only
+  environment:
+    aws_tag: "{{TAG_NAMESPACE}}:environment"
+    github_topic: null            # per-deployment; must not pin a repo to one env
+  owner:
+    aws_tag: "{{TAG_NAMESPACE}}:owner"
+    github_topic: null            # mutable; keep out of public topics
+  lifecycle:
+    aws_tag: "{{TAG_NAMESPACE}}:lifecycle"
+    github_topic: null
+
+# Always-present marker: any repo/resource carrying an in-scope AI asset gets
+# the inventory marker so "what does the AI standard govern?" is one query.
+inventory_marker:
+  github_topic: "{{TAG_NAMESPACE}}-ai-governed"
+  aws_equivalent: "presence of {{TAG_NAMESPACE}}:asset-id"
+
+# Kept OUT of public GitHub topics on purpose (public even on private repos):
+# environment, owner, business_unit, data specifics beyond the coarse class,
+# and anything customer-identifying, secret, or financial.
+
+# Enforcement: AWS Organizations tag policies (defined in aws-org-management)
+# declare valid keys and values and can move from monitor to enforce.

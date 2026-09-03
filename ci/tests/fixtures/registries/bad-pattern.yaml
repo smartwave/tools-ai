@@ -1,0 +1,5 @@
+# Fixture: an asset_id that does not match the minting grammar.
+registry:
+  - asset_id: "ORG-AI-dataops_pipeline"
+    name: dataops-pipeline
+    lifecycle: active

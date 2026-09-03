@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""check-evaluation — the evaluation set and its measured results.
+
+Usage: ci/check-evaluation <manifest> [...]
+
+Tier 2+ (Tier 1 warns): assets/<asset_id>/evaluation/eval-set.yaml exists and
+is well formed; its acceptable_error_rate and reasoning carry a declared_date
+EARLIER than the earliest results file (the threshold was agreed before any
+result existed — ordering is read from the dates inside the files, never from
+filesystem timestamps); the latest results stay within the threshold and show
+zero failures in every unacceptable error kind.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import evaluation, governance as gov
+from lib.cli import run
+from lib.config import load_config
+from lib.report import EXIT_OK
+
+
+def main():
+    paths = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not paths:
+        sys.stderr.write("usage: ci/check-evaluation <manifest> [...]\n")
+        return 1
+    config = load_config()
+    policy = gov.tier_controls()
+
+    code = EXIT_OK
+    for path in paths:
+        manifest = gov.load_manifest(path, config)
+        report = evaluation.evaluate(manifest, path, config, policy)
+        report.render()
+        code = code or report.exit_code
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(run(main))

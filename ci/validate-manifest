@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""validate-manifest — schema + vocabulary validation for governance manifests.
+
+Usage: ci/validate-manifest <manifest.yaml> [...]
+
+Asserts, per manifest:
+  - it validates against schemas/manifest.schema.json, with {{ASSET_ID_PREFIX}}
+    and friends resolved from the adopter configuration in memory;
+  - every enumerated value exists in vocabulary/vocabulary.yaml (schema and
+    vocabulary disagreeing is itself a failure, naming both files);
+  - the tier-conditional shape: Tier 1 needs only the five core fields, Tier 2+
+    the schema's full `required` list.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from lib import governance as gov
+from lib.cli import run
+from lib.config import load_config, unresolved_tokens
+from lib.loader import where
+from lib.report import EXIT_OK, Report
+
+import jsonschema
+
+
+def validate_one(path, config, schema, vocab):
+    report = Report("validate-manifest", path, config)
+    manifest = gov.load_manifest(path, config)
+
+    if not isinstance(manifest, dict):
+        report.fail("schema", "%s: manifest is not a mapping" % path)
+        return report
+
+    # Tier-conditional required fields. The schema's `required` list is the
+    # Tier 2+ shape; Tier 1 needs only the core five.
+    tier = manifest.get("tier")
+    required = list(schema.get("required", []))
+    tier_1_shape = tier == 1
+    if tier_1_shape:
+        for field in required:
+            if field not in gov.TIER_1_REQUIRED and field not in manifest:
+                report.warn("B1.3", "tier 1: optional field '%s' absent "
+                                    "(a manifest is recommended, not required, at tier 1)"
+                            % field)
+        required = list(gov.TIER_1_REQUIRED)
+
+    validator_schema = dict(schema)
+    validator_schema["required"] = required
+    validator = jsonschema.Draft202012Validator(validator_schema)
+    for error in sorted(validator.iter_errors(manifest), key=lambda e: list(e.path)):
+        field = ".".join(str(part) for part in error.path) or "(root)"
+        report.fail("schema",
+                    "%s: %s — %s" % (where(path, field.split(".")[0]), field, error.message))
+
+    # Vocabulary cross-check: the schema and the vocabulary must agree, and the
+    # manifest value must exist in the vocabulary.
+    for field, vocab_key in gov.VOCAB_FIELDS.items():
+        allowed = gov.vocab_values(vocab, vocab_key)
+        if not allowed:
+            continue
+        schema_enum = ((schema.get("properties") or {}).get(field) or {}).get("enum")
+        if schema_enum is not None and set(schema_enum) != allowed:
+            report.fail(
+                "vocabulary",
+                "schemas/manifest.schema.json and vocabulary/vocabulary.yaml "
+                "disagree on '%s': schema %s vs vocabulary %s"
+                % (field, sorted(map(str, schema_enum)), sorted(map(str, allowed))))
+        value = manifest.get(field)
+        if value is not None and value not in allowed:
+            report.fail("vocabulary",
+                        "%s: %s '%s' is not a vocabulary/vocabulary.yaml value %s"
+                        % (where(path, field), field, value, sorted(map(str, allowed))))
+
+    for key, value in manifest.items():
+        for token in unresolved_tokens(value):
+            report.warn("config",
+                        "%s: '%s' still carries the unresolved token {{%s}}"
+                        % (where(path, key), key, token))
+
+    if not report.failures:
+        report.ok("schema", "valid against the %s shape"
+                  % ("tier 1" if tier_1_shape else "tier 2+"))
+    return report
+
+
+def main():
+    paths = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not paths:
+        sys.stderr.write("usage: ci/validate-manifest <manifest.yaml> [...]\n")
+        return 1
+
+    config = load_config()
+    schema = gov.manifest_schema(config)
+    vocab = gov.vocabulary()
+
+    code = EXIT_OK
+    for path in paths:
+        report = validate_one(path, config, schema, vocab)
+        report.render()
+        code = code or report.exit_code
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(run(main))

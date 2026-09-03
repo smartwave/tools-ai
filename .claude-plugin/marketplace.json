@@ -1,0 +1,29 @@
+{
+  "name": "tools-ai",
+  "owner": {
+    "name": "Matt Richardson (smartwave)"
+  },
+  "metadata": {
+    "description": "Private Claude Code plugin marketplace for the tools-ai repo. Two governance plugins (placeholder edition, meant to be adopted) and one personal plugin."
+  },
+  "plugins": [
+    {
+      "name": "personal-assistant",
+      "source": "./plugins/personal-assistant",
+      "version": "2.0.0",
+      "description": "Personal productivity skills. Includes open-items — reminders of Claude work started and not finished, kept as one file per project in a single tracker folder (~/Documents/Claude/Claude Task Tracker, overridable with CLAUDE_TASK_TRACKER), with categories inside each file. Three commands (log-item, end-of-session, open-items-status), a format validator, and a status listing so choosing where an item goes is picking from a list rather than remembering. Nothing observes whether work is finished; the user decides, and closing deletes the line."
+    },
+    {
+      "name": "ai-solution-builder",
+      "source": "./plugins/ai-solution-builder",
+      "version": "1.4.0",
+      "description": "AI Solution Builder — guides an AI solution through the staged, gated pipeline. Stage 0 is four steps: the Ultralight Problem Brief (problem statement, validated root cause, process-level future state, in the person's own words), the POC Brief with its paste-ready build prompt, a local throwaway proof of concept with a change log of every vibe-coded change, and the POC Summary that opens the conversation with IT. Then the AI Solution Requirements document (Gate 1), the Solution Design with authored tests (required for a new Tier 2/3 solution), the Solution Spec, and the work-effort Epic in the work tracker (B1.9), for AI solutions that drive a business workflow. Org-wide and non-engineer friendly. Guides, never authors the person's content; prototypes POCs to learn (never to deploy); refines and records the builder's own input into review-ready documents; proposes work-tracker issues with explicit approval; never originates, fabricates, or auto-creates. Reads the bundled Standard, methods, and templates as source of truth so guidance can't drift from policy. Ships five Gemini Gem instruction sets that produce the same Stage 0 outputs."
+    },
+    {
+      "name": "grc-core",
+      "source": "./plugins/grc-core",
+      "version": "1.1.0",
+      "description": "Governance, Risk & Compliance skills. Includes security-review-travel-risk (international travel work-request risk review), tprm-security-review (read-only third-party/vendor security risk review scoring Likelihood × Impact on the sanctioned matrix), and tprm-vendor-review-update (gated write-back of an approved review outcome to the compliance platform — Drata in the reference configuration — and the inventory). Recommendation only — never approves, sends, or acts."
+    }
+  ]
+}
